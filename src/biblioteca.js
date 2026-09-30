@@ -5,6 +5,7 @@ import './dados/cidades.js';
 import './nucleo/util.js';
 import './nucleo/detectar.js';
 import './formatos/zip.js';
+import './formatos/xml.js';
 import './formatos/leitura.js';
 import './nucleo/geradores.js';
 import './formatos/amostra.js';

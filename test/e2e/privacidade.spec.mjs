@@ -116,7 +116,7 @@ test('arquivo que trava a biblioteca de leitura: o vigia interrompe e mostra men
   expect(rede.externos()).toEqual([]);
 });
 
-test('site: botão baixa o pacote .zip com o mesmo arquivo do site; no arquivo offline o botão não aparece', async ({ page, context }, info) => {
+test('site: botão baixa o pacote .zip com o mesmo arquivo do site', async ({ page, context }, info) => {
   const JSZip = (await import('jszip')).default;
   const crypto = await import('node:crypto');
   const fs = await import('node:fs');
@@ -134,7 +134,9 @@ test('site: botão baixa o pacote .zip com o mesmo arquivo do site; no arquivo o
   const doSite = fs.readFileSync(path.join(raiz, 'dist/index.html'));
   expect(crypto.createHash('sha256').update(doZip).digest('hex')).toBe(crypto.createHash('sha256').update(doSite).digest('hex'));
   expect(rede.externos()).toEqual([]);
-  // O mesmo arquivo aberto do disco não oferece o download (já é a versão sem internet)
+});
+
+test('arquivo offline: o botão de baixar não aparece (já é a versão sem internet)', async ({ page }) => {
   await abrirApp(page, MODOS[1].url);
   await expect(page.getByRole('link', { name: 'Baixar para usar sem internet' })).toHaveCount(0);
 });
