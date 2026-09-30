@@ -37,7 +37,7 @@ const bom = {
       name: pacote.name,
       version: versao,
       licenses: [{ license: { id: pacote.license } }],
-      hashes: [{ alg: 'SHA-256', content: sha256(ler('dist/anonimizador.html')) }]
+      hashes: [{ alg: 'SHA-256', content: sha256(ler('dist/gerador-planilhas-exemplo.html')) }]
     }
   },
   components: [

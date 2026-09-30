@@ -31,14 +31,14 @@ function rodar(args) {
 function conferirDist() {
   const dist = path.join(raiz, 'dist');
   const ler = (n) => fs.readFileSync(path.join(dist, n));
-  if (!ler('index.html').equals(ler('anonimizador.html'))) throw new Error('index.html diferente de anonimizador.html');
+  if (!ler('index.html').equals(ler('gerador-planilhas-exemplo.html'))) throw new Error('index.html diferente de gerador-planilhas-exemplo.html');
   for (const linha of ler('SHA256SUMS').toString('utf8').trim().split('\n')) {
     const [hash, nome] = linha.split(/\s+/);
     const real = crypto.createHash('sha256').update(ler(nome)).digest('hex');
     if (real !== hash) throw new Error('SHA256SUMS não confere para ' + nome);
   }
-  const tamanho = ler('anonimizador.html').length;
-  console.log('dist/anonimizador.html: ' + (tamanho / 1048576).toFixed(2) + ' MB, hashes conferidos');
+  const tamanho = ler('gerador-planilhas-exemplo.html').length;
+  console.log('dist/gerador-planilhas-exemplo.html: ' + (tamanho / 1048576).toFixed(2) + ' MB, hashes conferidos');
   return true;
 }
 

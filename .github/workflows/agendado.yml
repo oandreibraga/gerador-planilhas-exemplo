@@ -105,7 +105,7 @@ jobs:
           fi
           url="${URL_SITE:-https://${DONO,,}.github.io/${REPO}/}"
           gh release download "$tag" --repo "$GITHUB_REPOSITORY" --pattern SHA256SUMS --dir "$RUNNER_TEMP/rel"
-          esperado=$(grep ' anonimizador.html$' "$RUNNER_TEMP/rel/SHA256SUMS" | cut -d' ' -f1)
+          esperado=$(grep ' gerador-planilhas-exemplo.html$' "$RUNNER_TEMP/rel/SHA256SUMS" | cut -d' ' -f1)
           no_ar=$(curl -fsSL "$url" | sha256sum | cut -d' ' -f1)
           echo "Release $tag: $esperado"
           echo "Site $url: $no_ar"

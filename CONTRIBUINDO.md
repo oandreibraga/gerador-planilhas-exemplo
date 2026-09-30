@@ -18,7 +18,7 @@ node scripts/verificar.mjs
 
 `verificar.mjs` roda, em ordem: ESLint → testes de unidade e integração (inclui a suíte do navegador no jsdom) → build → conferência dos arquivos em `dist/`. Se passar localmente, a maior parte do CI também passa.
 
-Testes em navegadores de verdade (Playwright) rodam **só no CI**; a configuração se recusa a rodar fora dele. Para conferir à mão, abra `dist/testes.html` e `dist/anonimizador.html` no seu navegador.
+Testes em navegadores de verdade (Playwright) rodam **só no CI**; a configuração se recusa a rodar fora dele. Para conferir à mão, abra `dist/testes.html` e `dist/gerador-planilhas-exemplo.html` no seu navegador.
 
 ## Onde fica cada coisa
 

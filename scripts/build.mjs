@@ -1,6 +1,6 @@
 // Monta os arquivos publicados em dist/:
-//   anonimizador.html  app completo em um arquivo (offline)
-//   index.html         o mesmo arquivo, para o site (mesmo hash)
+//   gerador-planilhas-exemplo.html  app completo em um arquivo (offline)
+//   index.html                      o mesmo arquivo, para o site (mesmo hash)
 //   testes.html        suíte de testes para abrir no navegador
 //   SHA256SUMS         hashes para quem baixa conferir
 // Uso: node scripts/build.mjs [--tema caminho/para/tema.css]
@@ -123,7 +123,7 @@ async function principal() {
   const tema = argumento('--tema');
   const { html } = await montarApp({ tema: tema ? path.resolve(tema) : null });
   const testes = await montarTestes();
-  const arquivos = { 'anonimizador.html': html, 'index.html': html, 'testes.html': testes };
+  const arquivos = { 'gerador-planilhas-exemplo.html': html, 'index.html': html, 'testes.html': testes };
   const somas = [];
   for (const [nome, conteudo] of Object.entries(arquivos)) {
     fs.writeFileSync(path.join(dist, nome), conteudo);

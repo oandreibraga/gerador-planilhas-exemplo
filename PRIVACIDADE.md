@@ -1,6 +1,6 @@
 # Privacidade e limites
 
-Este texto explica o que acontece com a sua planilha e o que o arquivo gerado contém. Vale para o site e para o arquivo baixado (`anonimizador.html`), que são o mesmo arquivo.
+Este texto explica o que acontece com a sua planilha e o que o arquivo gerado contém. Vale para o site e para o arquivo baixado (`gerador-planilhas-exemplo.html`), que são o mesmo arquivo.
 
 ## O que acontece com a sua planilha
 

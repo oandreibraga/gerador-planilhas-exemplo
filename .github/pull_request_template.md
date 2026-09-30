@@ -13,7 +13,7 @@
 
 - [ ] `node scripts/verificar.mjs` passou na minha máquina
 - [ ] Teste novo cobrindo a mudança (unidade, integração ou navegador)
-- [ ] Se muda a tela: abri `dist/anonimizador.html` no navegador e conferi à mão
+- [ ] Se muda a tela: abri `dist/gerador-planilhas-exemplo.html` no navegador e conferi à mão
 
 ## Checklist
 

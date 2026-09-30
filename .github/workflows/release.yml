@@ -48,7 +48,7 @@ jobs:
       - uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
         with:
           subject-path: |
-            dist/anonimizador.html
+            dist/gerador-planilhas-exemplo.html
             dist/index.html
       - name: Notas da versão (seção do CHANGELOG.md)
         run: |
@@ -64,19 +64,19 @@ jobs:
             echo '```'
             cat dist/SHA256SUMS
             echo '```'
-            echo "Proveniência: \`gh attestation verify anonimizador.html --repo $GITHUB_REPOSITORY\`"
+            echo "Proveniência: \`gh attestation verify gerador-planilhas-exemplo.html --repo $GITHUB_REPOSITORY\`"
           } >> "$RUNNER_TEMP/notas.md"
       - name: Criar a Release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh release create "$GITHUB_REF_NAME" \
-            dist/anonimizador.html dist/testes.html dist/SHA256SUMS dist/sbom.cdx.json \
-            --repo "$GITHUB_REPOSITORY" --title "Anonimizador $VERSAO" --notes-file "$RUNNER_TEMP/notas.md" --verify-tag
+            dist/gerador-planilhas-exemplo.html dist/testes.html dist/SHA256SUMS dist/sbom.cdx.json \
+            --repo "$GITHUB_REPOSITORY" --title "Gerador de planilhas de exemplo $VERSAO" --notes-file "$RUNNER_TEMP/notas.md" --verify-tag
       - name: Preparar o site
         run: |
           mkdir -p site
-          cp dist/index.html dist/anonimizador.html dist/SHA256SUMS site/
+          cp dist/index.html dist/gerador-planilhas-exemplo.html dist/SHA256SUMS site/
       - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
         with:
           path: site

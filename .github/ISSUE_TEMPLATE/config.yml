@@ -1,5 +1,5 @@
 blank_issues_enabled: false
 contact_links:
   - name: Problema de segurança ou vazamento de dados
-    url: https://github.com/OWNER/REPO/security/advisories/new
+    url: https://github.com/oandreibraga/gerador-planilhas-exemplo/security/advisories/new
     about: Não abra issue pública. Relate em particular, como explicado no SEGURANCA.md.

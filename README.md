@@ -10,7 +10,7 @@ Cria uma cópia da sua planilha com **dados inventados**, mantendo a mesma estru
 
 ## Como usar
 
-1. Abra o site ou o arquivo `anonimizador.html` (baixado da página de [Releases](../../releases)).
+1. Abra o site (https://oandreibraga.github.io/gerador-planilhas-exemplo/) ou o arquivo `gerador-planilhas-exemplo.html` (baixado da página de [Releases](../../releases)).
 2. Escolha a planilha (`.xlsx`, `.xlsm`, `.xls`, `.xlsb`, `.ods`, `.csv` ou um `.zip` com planilhas). Se só tiver os títulos das colunas, cole-os na aba "Só tenho os títulos das colunas".
 3. Confira o tipo que a ferramenta identificou em cada coluna e corrija se precisar.
 4. Escolha 10, 20 ou 30 linhas e clique em **Baixar planilha de exemplo**. O arquivo sai como `<nome original>_amostra.xlsx`.
@@ -32,11 +32,11 @@ A análise usa até 500 linhas de cada aba (as primeiras); o arquivo gerado tem 
 Cada versão publica o arquivo `SHA256SUMS`. Para conferir que o seu arquivo é o mesmo que foi montado pelo GitHub a partir deste código:
 
 ```powershell
-Get-FileHash anonimizador.html -Algorithm SHA256        # Windows
+Get-FileHash gerador-planilhas-exemplo.html -Algorithm SHA256        # Windows
 ```
 ```sh
-sha256sum anonimizador.html                               # Linux/macOS
-gh attestation verify anonimizador.html --repo DONO/REPOSITORIO   # proveniência (GitHub CLI)
+sha256sum gerador-planilhas-exemplo.html                               # Linux/macOS
+gh attestation verify gerador-planilhas-exemplo.html --repo oandreibraga/gerador-planilhas-exemplo   # proveniência (GitHub CLI)
 ```
 
 ## Para quem desenvolve
@@ -46,7 +46,7 @@ Requisitos: Node.js 22 ou mais novo. Nada é instalado fora da pasta do projeto.
 ```sh
 npm ci --ignore-scripts        # ferramentas de build e teste
 node scripts/verificar.mjs     # tudo: regras de código, testes, build e conferência (≈ 40 s)
-node scripts/build.mjs         # só o build: dist/anonimizador.html, dist/index.html, dist/testes.html, SHA256SUMS
+node scripts/build.mjs         # só o build: dist/gerador-planilhas-exemplo.html, dist/index.html, dist/testes.html, SHA256SUMS
 ```
 
 - **Testes no navegador de verdade:** abra `dist/testes.html` à mão no navegador. Os testes automatizados em Chrome/Firefox/WebKit (Playwright) rodam **só no CI**.
@@ -84,4 +84,4 @@ test/           unidade, integração, navegador (jsdom) e e2e (Playwright, só 
 
 ## Licença
 
-[Apache-2.0](LICENSE) (a confirmar pelo jurídico antes do lançamento). Componentes de terceiros em [NOTICE](NOTICE); a lista completa vai em cada Release (SBOM).
+[Apache-2.0](LICENSE). Componentes de terceiros em [NOTICE](NOTICE); a lista completa vai em cada Release (SBOM).

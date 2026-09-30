@@ -13,7 +13,7 @@ export const canarios = () => JSON.parse(fs.readFileSync(fixtura('canarios.json'
 // O mesmo app aberto de dois jeitos: pelo site e pelo arquivo baixado (file://).
 export const MODOS = [
   { nome: 'site', url: 'http://127.0.0.1:4173/' },
-  { nome: 'arquivo offline', url: pathToFileURL(path.join(raiz, 'dist/anonimizador.html')).href }
+  { nome: 'arquivo offline', url: pathToFileURL(path.join(raiz, 'dist/gerador-planilhas-exemplo.html')).href }
 ];
 
 // Registra toda requisição do contexto (páginas e Workers) e bloqueia qualquer uma que não seja
