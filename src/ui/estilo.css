@@ -273,6 +273,8 @@ tr.manter.pisca > td { animation: none; }
   .marca-linha2 { font-size: 24px; }
   .selo { display: none; }
   .passo { padding: 16px; }
+  .modos { display: flex; flex-direction: column; border-radius: 14px; }
+  .modo { text-align: center; }
   .acoes { margin-left: 0; width: 100%; }
   .acoes .btn { flex: 1 1 auto; }
   .toasts { bottom: 190px; }
