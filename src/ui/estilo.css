@@ -46,7 +46,7 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .marca { display: flex; flex-direction: column; line-height: 1.05; color: var(--marca); }
 .marca-linha1 { font-size: 15px; letter-spacing: .06em; font-weight: 400; }
 .marca-linha1 b { font-weight: 800; }
-.marca-linha2 { font-size: 30px; font-weight: 300; color: var(--destaque); letter-spacing: -.01em; }
+.marca-linha2 { font-size: 30px; font-weight: 300; color: var(--destaque-texto); letter-spacing: -.01em; }
 .selo { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; color: var(--marca); background: var(--destaque-suave); padding: 5px 12px; border-radius: 999px; }
 
 .faixa {
@@ -90,6 +90,7 @@ button, input, select, textarea { font: inherit; color: inherit; }
   transition: border-color .15s, background-color .15s;
 }
 .dropzone:hover { border-color: var(--destaque-texto); background: var(--destaque-suave); }
+.dropzone:focus-within { outline: 3px solid var(--destaque-texto); outline-offset: 2px; }
 .dz-icone { color: var(--destaque-texto); min-height: 34px; display: flex; align-items: center; }
 .dz-titulo { font-weight: 650; font-size: 18px; color: var(--marca); overflow-wrap: anywhere; }
 .dz-sub { color: var(--texto-2); font-size: 14px; }

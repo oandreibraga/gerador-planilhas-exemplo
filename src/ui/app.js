@@ -48,6 +48,9 @@ function h(tag, props, filhos) {
 }
 
 // Único uso de innerHTML: desenhos SVG fixos de ICONES (nunca texto vindo do arquivo ou da pessoa).
+var ultimoId = 0;
+function novoId(prefixo) { return prefixo + '-' + (++ultimoId); }
+
 function icone(nome) {
   var el = h('span', { class: 'ico' });
   el.innerHTML = ICONES[nome]; // eslint-disable-line no-restricted-properties
@@ -305,6 +308,7 @@ function montar(raiz, opcoes) {
     corrompido: 'Não foi possível abrir este arquivo',
     formato: 'Tipo de arquivo não aceito',
     grande: 'Arquivo grande demais',
+    leitura: 'O arquivo não pôde ser lido',
     vazio: 'Não há nada para ler'
   };
   function mostrarErro(e) {
@@ -369,11 +373,15 @@ function montar(raiz, opcoes) {
   var abaColar = h('button', { type: 'button', role: 'tab', class: 'modo', 'aria-selected': 'false', text: 'Só tenho os títulos das colunas' });
   var modos = h('div', { class: 'modos', role: 'tablist', 'aria-label': 'Como informar a planilha' }, [abaArquivo, abaColar]);
 
-  var entrada = h('input', { type: 'file', class: 'entrada-oculta', accept: '.xlsx,.xlsm,.xls,.xlsb,.ods,.csv,.zip', tabindex: '-1' });
-  var dzIcone = h('span', { class: 'dz-icone' });
-  var dzTitulo = h('span', { class: 'dz-titulo' });
-  var dzSub = h('span', { class: 'dz-sub' });
-  var dropzone = h('label', { class: 'dropzone', tabindex: '0', role: 'button', 'aria-label': 'Escolher planilha' }, [entrada, dzIcone, dzTitulo, dzSub]);
+  var idTitulo = novoId('dz-titulo'), idSub = novoId('dz-sub');
+  var entrada = h('input', {
+    type: 'file', class: 'entrada-oculta', accept: '.xlsx,.xlsm,.xls,.xlsb,.ods,.csv,.zip',
+    'aria-label': 'Escolher planilha', 'aria-describedby': idTitulo + ' ' + idSub
+  });
+  var dzIcone = h('span', { class: 'dz-icone', 'aria-hidden': 'true' });
+  var dzTitulo = h('span', { class: 'dz-titulo', id: idTitulo });
+  var dzSub = h('span', { class: 'dz-sub', id: idSub });
+  var dropzone = h('label', { class: 'dropzone' }, [entrada, dzIcone, dzTitulo, dzSub]);
   var escolhaZip = h('div', { class: 'escolha-zip', hidden: true });
   var painelArquivo = h('div', { class: 'painel' }, [dropzone, escolhaZip]);
 
@@ -590,6 +598,15 @@ function montar(raiz, opcoes) {
       tarefa: function () {
         return file.arrayBuffer().then(function (buf) {
           return processar(file.name, new Uint8Array(buf), file.size);
+        }, function (causa) {
+          // O navegador não conseguiu ler o arquivo do disco (unidade de rede desconectada, arquivo só na
+          // nuvem, movido ou aberto com bloqueio por outro programa)
+          var e = new Error('Não foi possível ler este arquivo do computador. Se ele está numa pasta de rede ou na nuvem ' +
+            '(OneDrive, Google Drive…), confira se está disponível, ou copie para a Área de Trabalho e tente de novo.');
+          e.tipo = 'leitura';
+          e.amigavel = true;
+          e.detalhe = String((causa && (causa.name + ': ' + causa.message)) || causa);
+          throw e;
         });
       },
       aoErro: function () { limparEstrutura(); escolhaZip.hidden = true; estadoDropzone('erro', file.name); }
@@ -951,9 +968,6 @@ function montar(raiz, opcoes) {
     var f = entrada.files && entrada.files[0];
     entrada.value = '';
     if (f) carregarArquivo(f);
-  });
-  dropzone.addEventListener('keydown', function (e) {
-    if ((e.key === 'Enter' || e.key === ' ') && !estado.ocupado) { e.preventDefault(); entrada.click(); }
   });
 
   if (!opcoes.semEventosGlobais) {

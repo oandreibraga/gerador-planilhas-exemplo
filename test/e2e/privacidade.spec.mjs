@@ -87,7 +87,11 @@ for (const modo of MODOS) {
   });
 }
 
-test('sem internet: o site continua funcionando depois de carregado', async ({ page, context }, info) => {
+test('sem internet: o site continua funcionando depois de carregado', async ({ page, context, browserName }, info) => {
+  // No WebKit, o modo offline do Playwright bloqueia também a leitura do arquivo escolhido e o Worker em blob:
+  // ("The I/O read operation failed" / "WebKit encountered an internal error"), o que não acontece num Safari
+  // de verdade sem internet. Chromium e Firefox cobrem este caso; o arquivo offline (file://) roda nos três.
+  test.skip(browserName === 'webkit', 'limitação da emulação offline do Playwright no WebKit');
   const rede = await vigiarRede(context, MODOS[0].url);
   await abrirApp(page, MODOS[0].url);
   await context.setOffline(true);
