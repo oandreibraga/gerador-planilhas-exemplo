@@ -142,6 +142,8 @@ function montarAba(aba, n, rng, ctx) {
   var ws = {};
   var maxR = 0, maxC = 0, tem = false;
   function por(r, c, cel) {
+    // O Excel guarda no máximo 32.767 caracteres por célula (um arquivo danificado pode trazer mais)
+    if (cel && typeof cel.v === 'string' && cel.v.length > 32767) cel = Object.assign({}, cel, { v: cel.v.slice(0, 32767) });
     ws[XLSX.utils.encode_cell({ r: r, c: c })] = cel;
     if (r > maxR) maxR = r;
     if (c > maxC) maxC = c;

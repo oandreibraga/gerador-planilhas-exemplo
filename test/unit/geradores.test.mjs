@@ -55,3 +55,16 @@ test('nomes de aba inválidos (arquivo danificado) viram nomes que o Excel aceit
   assert.ok(!minusculos.includes('history'));
   assert.equal(wb.SheetNames[5], 'resumo (2)');
 });
+
+test('texto maior que o limite do Excel (32.767 caracteres) é cortado, sem erro ao gerar', () => {
+  const enorme = 'Título ' + 'x'.repeat(40000);
+  const arq = {
+    nome: 'x.xlsx', base: 'x', ext: 'xlsx', origem: 'arquivo', data1904: false, textosReais: new Set(),
+    abas: [{ nome: 'P', indice: 0, oculta: 0, linhas: [[{ t: 's', v: enorme }], [{ t: 's', v: 'A1' }], [{ t: 's', v: 'A2' }]], totalLinhas: 3, merges: [], cols: [] }]
+  };
+  A.detectar.analisarArquivo(arq);
+  const { wb } = gerarERelar(arq, 10, 1);
+  const cab = wb.Sheets[wb.SheetNames[0]].A1;
+  assert.equal(cab.v.length, 32767);
+  assert.ok(cab.v.startsWith('Título xxx'));
+});
