@@ -16,16 +16,19 @@ function indiceReais(ctx) {
   var chave = ctx.textosReais || (ctx.textosReais = new Set());
   var ind = cacheIndice.get(chave);
   if (ind) return ind;
-  ind = { exatos: new Set(), porPalavra: new Map() };
+  // exatos: todos os textos; longos: os de 5+ caracteres, que também não podem aparecer DENTRO de um gerado.
+  // A busca testa cada trecho de palavras seguidas do texto gerado no conjunto: o custo depende do tamanho do
+  // texto gerado, não de quantos textos reais existem (arquivo inteiro com milhões de textos).
+  ind = { exatos: new Set(), longos: new Set(), maxPalavras: 1 };
   chave.forEach(function (t) {
     var n = normTexto(t);
     if (!n) return;
     ind.exatos.add(n);
     if (n.length < 5) return;
-    var palavras = n.split(' ');
-    var lista = ind.porPalavra.get(palavras[0]);
-    if (!lista) { lista = []; ind.porPalavra.set(palavras[0], lista); }
-    lista.push(palavras);
+    ind.longos.add(n);
+    var qtd = 1;
+    for (var i = 0; i < n.length; i++) if (n.charCodeAt(i) === 32) qtd++;
+    if (qtd > ind.maxPalavras) ind.maxPalavras = qtd;
   });
   cacheIndice.set(chave, ind);
   return ind;
@@ -37,14 +40,12 @@ function vazouTexto(ctx, s) {
   if (ind.exatos.has(n)) return true;
   var p = n.split(' ');
   for (var i = 0; i < p.length; i++) {
-    var candidatos = ind.porPalavra.get(p[i]);
-    if (!candidatos) continue;
-    for (var k = 0; k < candidatos.length; k++) {
-      var c = candidatos[k];
-      if (c.length > p.length - i) continue;
-      var igual = true;
-      for (var j = 1; j < c.length; j++) if (p[i + j] !== c[j]) { igual = false; break; }
-      if (igual) return true;
+    var trecho = p[i];
+    var fim = Math.min(p.length, i + ind.maxPalavras);
+    for (var j = i + 1; ; j++) {
+      if (trecho.length >= 5 && ind.longos.has(trecho)) return true;
+      if (j >= fim) break;
+      trecho += ' ' + p[j];
     }
   }
   return false;

@@ -14,8 +14,11 @@ A.LIMITES = {
 };
 
 // ---------- texto ----------
+var RE_NAO_ASCII = /[^\u0000-\u007f]/; // eslint-disable-line no-control-regex
 U.semAcento = function (s) {
-  return String(s).normalize('NFD').replace(/[̀-ͯ]/g, '');
+  s = String(s);
+  if (!RE_NAO_ASCII.test(s)) return s; // caminho rápido: sem letras acentuadas, nada a tirar
+  return s.normalize('NFD').replace(/[̀-ͯ]/g, '');
 };
 U.normalizar = function (s) {
   return U.semAcento(String(s).toLowerCase()).replace(/\s+/g, ' ').trim();

@@ -83,8 +83,9 @@ function tamanhoLegivel(b) {
   return (b / 1048576).toFixed(1).replace('.', ',') + ' MB';
 }
 
+// Aceita bytes (amostra) ou um Blob já pronto (arquivo inteiro).
 function baixarArquivo(nome, bytes) {
-  var blob = new Blob([bytes], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+  var blob = bytes instanceof Blob ? bytes : new Blob([bytes], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
   var url = URL.createObjectURL(blob);
   var a = document.createElement('a');
   a.href = url;
@@ -153,7 +154,8 @@ function montar(raiz, opcoes) {
   var DET = A.detectar, RES = A.resumo, L = A.LIMITES, U = A.util;
   var baixar = opcoes.baixar || baixarArquivo;
   var copiar = opcoes.copiar || copiarTexto;
-  var estado = { arquivo: null, n: 20, ocupado: false, modo: 'arquivo' };
+  // modoSaida: 'amostra' (poucas linhas inventadas) ou 'inteiro' (o arquivo todo, com os dados sensíveis trocados)
+  var estado = { arquivo: null, n: 20, ocupado: false, modo: 'arquivo', modoSaida: 'amostra', original: null, acoes: {} };
 
   // ---------- trabalho pesado fora da tela (Web Worker) ----------
   // O Worker é montado com os mesmos códigos já embutidos na página (SheetJS + biblioteca + trabalhador),
@@ -175,6 +177,7 @@ function montar(raiz, opcoes) {
       trabalhador.onmessage = function (ev) {
         var p = pedidos[ev.data.id];
         if (!p) return;
+        if (ev.data.progresso != null) { if (p.progresso) p.progresso(ev.data.progresso); return; }
         delete pedidos[ev.data.id];
         if (ev.data.ok) p.ok(ev.data.res);
         else p.falha(Object.assign(new Error(ev.data.erro.message), ev.data.erro));
@@ -204,31 +207,40 @@ function montar(raiz, opcoes) {
     return Math.min(180000, Math.round(20000 + 2000 * mb));
   }
   // raiz.dataset.leitura diz onde foi a última leitura ("trabalhador" ou "tela"); usado nos testes de navegador.
-  function foraDaTela(op, nome, bytes, naTela) {
+  // `extra`: dados a mais para o Worker (modelo e ações do arquivo inteiro); `aoProgresso(fração)` recebe o
+  // andamento. Enquanto há andamento, o vigia é reiniciado (arquivo grande demora, mas não está travado).
+  function foraDaTela(op, nome, bytes, naTela, extra, aoProgresso) {
     var t = criarTrabalhador();
     if (!t) {
       raiz.dataset.leitura = 'tela';
       return Promise.resolve().then(naTela);
     }
     return new Promise(function (ok, falha) {
-      var id = proximoPedido++, limite = limiteLeitura(bytes);
-      var vigia = setTimeout(function () {
-        if (!pedidos[id]) return;
-        delete pedidos[id];
-        t.terminate();
-        if (trabalhador === t) trabalhador = null;
-        var e = new Error('A leitura demorou demais e foi interrompida. O arquivo pode estar danificado: tente abrir no Excel e salvar de novo.');
-        e.tipo = 'corrompido';
-        e.amigavel = true;
-        e.detalhe = 'sem resposta em ' + Math.round(limite / 1000) + ' s';
-        falha(e);
-      }, limite);
+      var id = proximoPedido++, limite = limiteLeitura(bytes), vigia = null;
+      function armar() {
+        clearTimeout(vigia);
+        vigia = setTimeout(function () {
+          if (!pedidos[id]) return;
+          delete pedidos[id];
+          t.terminate();
+          if (trabalhador === t) trabalhador = null;
+          var e = new Error('A leitura demorou demais e foi interrompida. O arquivo pode estar danificado: tente abrir no Excel e salvar de novo.');
+          e.tipo = 'corrompido';
+          e.amigavel = true;
+          e.detalhe = 'sem resposta em ' + Math.round(limite / 1000) + ' s';
+          falha(e);
+        }, limite);
+      }
+      armar();
       pedidos[id] = {
         ok: function (r) { clearTimeout(vigia); raiz.dataset.leitura = 'trabalhador'; ok(r); },
         falha: function (e) { clearTimeout(vigia); raiz.dataset.leitura = 'trabalhador'; falha(e); },
+        progresso: function (f) { armar(); if (aoProgresso) aoProgresso(f); },
         naTela: function () { clearTimeout(vigia); raiz.dataset.leitura = 'tela'; Promise.resolve().then(naTela).then(ok, falha); }
       };
-      t.postMessage({ id: id, op: op, nome: nome, bytes: bytes });
+      var msg = { id: id, op: op, nome: nome, bytes: bytes };
+      if (extra) Object.keys(extra).forEach(function (k) { msg[k] = extra[k]; });
+      t.postMessage(msg);
     });
   }
 
@@ -315,6 +327,7 @@ function montar(raiz, opcoes) {
     formato: 'Tipo de arquivo não aceito',
     grande: 'Arquivo grande demais',
     leitura: 'O arquivo não pôde ser lido',
+    recurso: 'Este arquivo tem algo que ainda não conseguimos trocar com segurança',
     vazio: 'Não há nada para ler'
   };
   function mostrarErro(e) {
@@ -425,20 +438,48 @@ function montar(raiz, opcoes) {
   // Passo 2
   var resumoArquivo = h('p', { class: 'passo-texto' });
   var listaAbas = h('div', { class: 'abas' });
+  var textoPasso2 = h('p', { class: 'passo-texto' });
+  var notaPasso2 = h('p', { class: 'nota' });
+
+  // O que gerar: amostra fictícia ou o arquivo inteiro com os dados sensíveis trocados
+  var grupoSaida = novoId('modo-saida');
+  function cartaoModo(valor, titulo, texto, selo) {
+    var radio = h('input', { type: 'radio', name: grupoSaida, value: valor, class: 'modo-radio' });
+    var cartao = h('label', { class: 'modo-cartao' }, [radio, h('span', { class: 'modo-textos' }, [
+      h('span', { class: 'modo-titulo' }, [h('span', { text: titulo }), selo ? h('span', { class: 'selo-novo', text: selo }) : null]),
+      h('span', { class: 'modo-desc', text: texto })
+    ])]);
+    radio.addEventListener('change', function () { if (radio.checked) definirModoSaida(valor); });
+    cartao._radio = radio;
+    return cartao;
+  }
+  var cartaoAmostra = cartaoModo('amostra', 'Amostra fictícia',
+    'Poucas linhas (10, 20 ou 30) com dados inventados e a mesma estrutura. Para pedir automações ou tirar dúvidas.');
+  var cartaoInteiro = cartaoModo('inteiro', 'Arquivo inteiro com dados trocados',
+    'Todas as linhas. Nomes, documentos, e-mails e telefones viram fictícios (o mesmo valor vira sempre o mesmo fictício); datas, valores e o resto ficam como estão. Para testar sistemas com volume de verdade.', 'novo');
+  var avisoSaida = h('p', { class: 'modo-aviso', hidden: true });
+  var escolhaSaida = h('fieldset', { class: 'modo-saida' }, [
+    h('legend', { text: 'O que você quer gerar?' }),
+    h('div', { class: 'modo-cartoes' }, [cartaoAmostra, cartaoInteiro]),
+    avisoSaida
+  ]);
+
   var passo2 = h('section', { class: 'passo estrutura', hidden: true }, [
     h('div', { class: 'passo-topo' }, [
       h('span', { class: 'passo-num', text: '2' }),
       h('div', null, [
         h('h2', { text: 'Confira as colunas' }),
         resumoArquivo,
-        h('p', { class: 'passo-texto', text: 'Veja o tipo que a ferramenta identificou em cada coluna e um exemplo do que vai aparecer no arquivo. ' +
-          'Se algum tipo estiver errado, é só trocar.' })
+        textoPasso2
       ])
     ]),
+    escolhaSaida,
     listaAbas,
-    h('p', { class: 'nota', text: 'Para ser rápida, a ferramenta analisa até ' + L.AMOSTRA + ' linhas de cada aba. Nomes, documentos, valores e textos dos exemplos são inventados. ' +
-      'Listas curtas (como tipo de documento ou status), valores 0/1 e colunas com um valor fixo mantêm o que está no original.' })
+    notaPasso2
   ]);
+
+  // Resultado do arquivo inteiro: o que foi trocado e tirado (sem mostrar nenhum valor real)
+  var painelResultado = h('section', { class: 'passo resultado', hidden: true, 'aria-live': 'polite' });
 
   // Passo 3 (barra fixa)
   var chips = [10, 20, 30].map(function (n) {
@@ -447,16 +488,18 @@ function montar(raiz, opcoes) {
   var botaoResumo = h('button', { type: 'button', class: 'btn sec', title: 'Texto com a lista de abas e colunas, pronto para colar no pedido de automação' });
   definirRotulo(botaoResumo, 'copiar', 'Copiar descrição das colunas');
   var botaoGerar = h('button', { type: 'button', class: 'btn pri grande' });
+  var grupoQtd = h('div', { class: 'qtd', role: 'group', 'aria-label': 'Linhas de exemplo em cada aba' }, [h('span', { class: 'qtd-rotulo', text: 'Linhas de exemplo em cada aba' })].concat(chips));
   var barra = h('footer', { class: 'barra', hidden: true }, [
     h('div', { class: 'barra-interna' }, [
       h('span', { class: 'passo-num pequeno', text: '3' }),
-      h('div', { class: 'qtd', role: 'group', 'aria-label': 'Linhas de exemplo em cada aba' }, [h('span', { class: 'qtd-rotulo', text: 'Linhas de exemplo em cada aba' })].concat(chips)),
+      grupoQtd,
       h('div', { class: 'acoes' }, [botaoResumo, botaoGerar])
     ])
   ]);
 
   conteudo.appendChild(passo1);
   conteudo.appendChild(passo2);
+  conteudo.appendChild(painelResultado);
   conteudo.appendChild(barra);
 
   var toasts = h('div', { class: 'toasts', 'aria-live': 'polite' });
@@ -532,11 +575,14 @@ function montar(raiz, opcoes) {
         DET.analisarArquivo(a);
         return a;
       });
-    }).then(function (arq) { return mostrarPlanilha(arq, nome, tamanho, deZip); });
+    }).then(function (arq) { return mostrarPlanilha(arq, nome, tamanho, deZip, bytes); });
   }
 
-  function mostrarPlanilha(arq, nome, tamanho, deZip) {
+  function mostrarPlanilha(arq, nome, tamanho, deZip, bytes) {
     arq.tamanho = tamanho;
+    estado.original = { nome: nome, bytes: bytes };
+    estado.acoes = {};
+    if (!podeInteiro()) estado.modoSaida = 'amostra';
     aplicarArquivo(arq);
     var cols = contarColunas(arq);
     estadoDropzone('carregado', nome, (deZip ? 'de dentro de ' + deZip + ' · ' : '') + tamanhoLegivel(tamanho) + ' · ' +
@@ -631,6 +677,9 @@ function montar(raiz, opcoes) {
       tarefa: function () {
         var arq = A.leitura.deCabecalho(campoColado.value, campoAba.value, campoNome.value);
         DET.analisarArquivo(arq);
+        estado.original = null;
+        estado.acoes = {};
+        estado.modoSaida = 'amostra';
         aplicarArquivo(arq);
         toast('Pronto! Encontramos ' + plural(arq.abas[0].colunas.length, 'coluna', 'colunas') + '.');
         return arq;
@@ -708,15 +757,57 @@ function montar(raiz, opcoes) {
       class: 'chk',
       title: colado ? 'Sem o arquivo não há dados reais para copiar.' : 'Copia os valores verdadeiros desta coluna para o arquivo. Use só se não forem dados sensíveis.'
     }, [manter, h('span', { text: 'usar reais' })]);
+    // Arquivo inteiro: o que fazer com a coluna (trocar, manter, generalizar, apagar)
+    var inteiro = estado.modoSaida === 'inteiro';
+    var selAcao = inteiro ? h('select', { class: 'sel-acao', 'aria-label': 'O que fazer com a coluna ' + col.letra }) : null;
+    function preencherAcoes() {
+      selAcao.textContent = '';
+      var atual = acaoDe(aba, col);
+      A.inteiro.acoesPossiveis(col.tipo).forEach(function (a) {
+        selAcao.appendChild(h('option', { value: a, selected: a === atual, text: ROTULO_ACAO[a] }));
+      });
+    }
+    if (inteiro) {
+      preencherAcoes();
+      selAcao.addEventListener('change', function () {
+        (estado.acoes[aba.nome] = estado.acoes[aba.nome] || {})[col.c] = selAcao.value;
+        protegido(function () { atualizar(); piscar(tr); });
+        if (selAcao.value === 'manter' && A.inteiro.acaoPadrao(col.tipo) === 'pseudonimizar') {
+          toast('Atenção: os dados reais da coluna ' + col.letra + ' vão ficar no arquivo gerado.', 'aviso');
+        }
+      });
+    }
     tr.appendChild(h('td', { class: 'c-col' }, [h('span', { class: 'letra', text: col.letra }), nome]));
     tr.appendChild(h('td', { class: 'c-tipo' }, [seletor, marcaAjuste]));
     tr.appendChild(celExemplo);
-    tr.appendChild(h('td', { class: 'c-manter' }, rotManter));
+    tr.appendChild(h('td', { class: 'c-manter' }, inteiro ? selAcao : rotManter));
 
     var detalhesAbertos = false;
+    function atualizarInteiro() {
+      var acao = acaoDe(aba, col);
+      var sensivel = A.inteiro.acaoPadrao(col.tipo) === 'pseudonimizar';
+      if (acao === 'manter') {
+        celExemplo.appendChild(sensivel
+          ? h('span', { class: 'aviso-real' }, [icone('alerta'), h('span', { text: 'Os dados reais desta coluna ficam no arquivo.' })])
+          : h('span', { class: 'exemplo vazio', text: col.tipo === 'vazia' ? 'Fica vazia, como no original.' : 'Fica como está (valores do original).' }));
+      } else if (acao === 'limpar') {
+        celExemplo.appendChild(h('span', { class: 'exemplo vazio', text: 'Fica em branco em todas as linhas.' }));
+      } else if (acao === 'generalizar') {
+        celExemplo.appendChild(h('span', { class: 'exemplo vazio', text: DET.FAMILIA[col.tipo] === 'data'
+          ? 'Cada data vira o dia 1 do mesmo mês (ex.: 17/05/2024 → 01/05/2024).'
+          : 'Cada número é arredondado para 2 algarismos (ex.: 1.234,56 → 1.200).' }));
+      } else {
+        var ex = exemplosDaColuna(col);
+        celExemplo.appendChild(h('div', { class: 'exemplos' }, ex.map(function (v) { return h('span', { class: 'exemplo', text: v }); })));
+        celExemplo.appendChild(h('span', { class: 'exemplo vazio', text: 'Cada valor vira sempre o mesmo fictício, em todas as abas.' }));
+      }
+      tr.classList.toggle('manter', acao === 'manter' && sensivel);
+    }
     function atualizar() {
       celExemplo.textContent = '';
-      if (col.manter) {
+      if (inteiro) {
+        atualizarInteiro();
+      } else if (col.manter) {
         celExemplo.appendChild(h('span', { class: 'aviso-real' }, [icone('alerta'), h('span', { text: 'Os dados reais desta coluna vão para o arquivo.' })]));
       } else if (col.tipo === 'vazia') {
         celExemplo.appendChild(h('span', { class: 'exemplo vazio', text: 'Fica vazia, como no original.' }));
@@ -765,11 +856,16 @@ function montar(raiz, opcoes) {
       var ajustado = col.tipo !== col.tipoDetectado;
       marcaAjuste.hidden = !ajustado;
       tr.classList.toggle('ajustado', ajustado);
-      tr.classList.toggle('manter', !!col.manter);
+      if (!inteiro) tr.classList.toggle('manter', !!col.manter);
     }
     seletor.addEventListener('change', function () {
       protegido(function () {
         DET.definirTipo(col, seletor.value);
+        if (inteiro) {
+          // Tipo novo, ação padrão do tipo novo (a escolha anterior pode nem existir para ele)
+          if (estado.acoes[aba.nome]) delete estado.acoes[aba.nome][col.c];
+          preencherAcoes();
+        }
         atualizar();
         piscar(tr);
       });
@@ -797,7 +893,7 @@ function montar(raiz, opcoes) {
         h('th', { scope: 'col', text: 'Coluna' }),
         h('th', { scope: 'col', text: 'Tipo de dado' }),
         h('th', { scope: 'col', text: 'Exemplo do que vai aparecer' }),
-        h('th', { scope: 'col', text: 'Dados reais' })
+        h('th', { scope: 'col', text: estado.modoSaida === 'inteiro' ? 'O que fazer' : 'Dados reais' })
       ])),
       corpo
     ]);
@@ -888,7 +984,7 @@ function montar(raiz, opcoes) {
     var corpo = h('div', { class: 'aba-corpo' });
     var cartao = h('details', { class: 'aba', open: aberto }, [cab, corpo]);
     if (estado.arquivo.origem !== 'colado') corpo.appendChild(controleCabecalho(aba, cartao));
-    var ligacoes = RES.descreverRelacoes(aba);
+    var ligacoes = estado.modoSaida === 'amostra' ? RES.descreverRelacoes(aba) : [];
     if (ligacoes.length) {
       corpo.appendChild(h('div', { class: 'ligacoes' }, [
         h('strong', { text: 'Ligações entre colunas que a amostra mantém' }),
@@ -906,6 +1002,7 @@ function montar(raiz, opcoes) {
 
   function renderizarEstrutura() {
     var arq = estado.arquivo;
+    atualizarModoSaida();
     listaAbas.textContent = '';
     var total = contarColunas(arq);
     arq.abas.forEach(function (aba, i) { listaAbas.appendChild(cartaoAba(aba, i === 0 || total <= 60)); });
@@ -916,13 +1013,129 @@ function montar(raiz, opcoes) {
     piscar(passo2);
   }
 
+  // ---------- o que gerar: amostra ou arquivo inteiro ----------
+  var ROTULO_ACAO = { pseudonimizar: 'Trocar por fictício', manter: 'Manter', generalizar: 'Generalizar', limpar: 'Apagar' };
+  function podeInteiro() { return !!(estado.original && /\.(xlsx|xlsm|csv|txt)$/i.test(estado.original.nome)); }
+  function acaoDe(aba, col) {
+    var escolhida = estado.acoes[aba.nome] && estado.acoes[aba.nome][col.c];
+    return escolhida && A.inteiro.acoesPossiveis(col.tipo).indexOf(escolhida) >= 0 ? escolhida : A.inteiro.acaoPadrao(col.tipo);
+  }
+  // Ações de todas as colunas (as escolhidas e as padrão), por aba — é o que vai para o processamento.
+  function acoesCompletas() {
+    var r = {};
+    estado.arquivo.abas.forEach(function (aba) {
+      r[aba.nome] = {};
+      aba.colunas.forEach(function (col) { r[aba.nome][col.c] = acaoDe(aba, col); });
+    });
+    return r;
+  }
+  function atualizarModoSaida() {
+    var inteiro = estado.modoSaida === 'inteiro', pode = podeInteiro();
+    cartaoAmostra._radio.checked = !inteiro;
+    cartaoInteiro._radio.checked = inteiro;
+    cartaoInteiro._radio.disabled = !pode;
+    cartaoAmostra.classList.toggle('selecionado', !inteiro);
+    cartaoInteiro.classList.toggle('selecionado', inteiro);
+    cartaoInteiro.classList.toggle('indisponivel', !pode);
+    avisoSaida.hidden = pode;
+    avisoSaida.textContent = !estado.original
+      ? 'Trocar o arquivo inteiro precisa do arquivo (não só dos títulos das colunas).'
+      : 'Trocar o arquivo inteiro funciona com .xlsx e .csv. Abra este arquivo no Excel, salve como .xlsx e envie de novo.';
+    textoPasso2.textContent = inteiro
+      ? 'Veja o tipo de cada coluna e escolha o que fazer com ela. Por padrão, o que identifica pessoas ou empresas é trocado por fictício; o resto fica como está.'
+      : 'Veja o tipo que a ferramenta identificou em cada coluna e um exemplo do que vai aparecer no arquivo. Se algum tipo estiver errado, é só trocar.';
+    notaPasso2.textContent = inteiro
+      ? 'Os tipos das colunas vêm das primeiras ' + L.AMOSTRA + ' linhas de cada aba, mas a troca vale para todas as linhas. Textos fora das tabelas (títulos, notas, caixas de texto) viram textos inventados. ' +
+        'Comentários, autor do arquivo, links e macros são tirados.'
+      : 'Para ser rápida, a ferramenta analisa até ' + L.AMOSTRA + ' linhas de cada aba. Nomes, documentos, valores e textos dos exemplos são inventados. ' +
+        'Listas curtas (como tipo de documento ou status), valores 0/1 e colunas com um valor fixo mantêm o que está no original.';
+    atualizarBarra();
+  }
+  function definirModoSaida(m) {
+    if (m === 'inteiro' && !podeInteiro()) { atualizarModoSaida(); return; }
+    if (estado.modoSaida === m) return;
+    estado.modoSaida = m;
+    painelResultado.hidden = true;
+    if (estado.arquivo) renderizarEstrutura(); else atualizarModoSaida();
+  }
+  function atualizarBarra() {
+    var inteiro = estado.modoSaida === 'inteiro';
+    grupoQtd.hidden = inteiro;
+    definirRotulo(botaoGerar, 'baixar', inteiro ? 'Gerar arquivo com dados trocados' : 'Baixar planilha de exemplo (' + estado.n + ' linhas)');
+  }
+
   // ---------- quantidade, gerar e resumo ----------
   function definirLinhas(n) {
     estado.n = n;
     chips.forEach(function (c) { c.setAttribute('aria-pressed', c.textContent === String(n) ? 'true' : 'false'); });
-    definirRotulo(botaoGerar, 'baixar', 'Baixar planilha de exemplo (' + n + ' linhas)');
+    atualizarBarra();
   }
   definirLinhas(estado.n);
+
+  function mostrarProgresso(f) {
+    var rotulo = botaoGerar.querySelector('span:last-child');
+    if (rotulo && botaoGerar.classList.contains('carregando')) rotulo.textContent = 'Trocando os dados… ' + Math.round(f * 100) + '%';
+  }
+
+  function gerarInteiro() {
+    if (!estado.arquivo || !podeInteiro()) return Promise.resolve(null);
+    var orig = estado.original, modelo = estado.arquivo;
+    return executar({
+      botao: botaoGerar,
+      texto: 'Trocando os dados…',
+      ok: 'Arquivo baixado',
+      antes: function () { painelResultado.hidden = true; },
+      tarefa: function () {
+        var acoes = acoesCompletas();
+        return foraDaTela('inteiro', orig.nome, orig.bytes, function () {
+          return A.inteiro.processar(new Blob([orig.bytes]), orig.nome, modelo, { acoes: acoes, progresso: mostrarProgresso });
+        }, { modelo: modelo, acoes: acoes }, mostrarProgresso).then(function (r) {
+          baixar(r.nome, r.blob);
+          mostrarResultado(r);
+          toast('Arquivo com dados trocados baixado: ' + r.nome);
+          return r;
+        });
+      }
+    });
+  }
+
+  var NOMES_CLASSE = {
+    pessoa: ['nome de pessoa', 'nomes de pessoas'], empresa: ['empresa', 'empresas'], cpf: ['CPF', 'CPFs'], cnpj: ['CNPJ', 'CNPJs'],
+    email: ['e-mail', 'e-mails'], telefone: ['telefone', 'telefones'], cep: ['CEP', 'CEPs'], endereco: ['endereço', 'endereços'],
+    bairro: ['bairro', 'bairros'], cidade: ['cidade', 'cidades'], chave: ['chave de acesso', 'chaves de acesso'], codigo: ['código', 'códigos'],
+    texto: ['texto', 'textos']
+  };
+  function mostrarResultado(r) {
+    var rel = r.relatorio;
+    painelResultado.textContent = '';
+    var total = rel.abas.reduce(function (s, a) { return s + a.trocadas; }, 0) + (rel.textosSoltos || 0);
+    var trocas = Object.keys(rel.pseudonimos || {}).map(function (c) {
+      var e = rel.pseudonimos[c], n = NOMES_CLASSE[c] || [c, c];
+      return plural(e.distintos, n[0] + ' diferente', n[1] + ' diferentes') + ' → a mesma quantidade de fictícios (' + plural(e.ocorrencias, 'ocorrência', 'ocorrências') + ')';
+    });
+    function bloco(titulo, itens, vazio) {
+      return h('div', { class: 'resultado-bloco' }, [
+        h('h3', { text: titulo }),
+        itens.length ? h('ul', null, itens.map(function (t) { return h('li', { text: t }); })) : h('p', { class: 'passo-texto', text: vazio })
+      ]);
+    }
+    painelResultado.appendChild(h('div', { class: 'passo-topo' }, [
+      h('span', { class: 'passo-num ok' }, [icone('ok')]),
+      h('div', null, [
+        h('h2', { text: 'Pronto: ' + r.nome }),
+        h('p', { class: 'passo-texto', text: plural(total, 'valor trocado', 'valores trocados') + ' em ' + plural(rel.abas.length, 'aba', 'abas') + '. O arquivo já foi baixado.' })
+      ])
+    ]));
+    painelResultado.appendChild(bloco('O que foi trocado', trocas, 'Nenhum valor precisou ser trocado.'));
+    painelResultado.appendChild(bloco('O que foi tirado do arquivo', (rel.removidas || []).map(function (t) { return t.charAt(0).toUpperCase() + t.slice(1); }), 'Nada precisou ser tirado.'));
+    if ((rel.avisos || []).length) painelResultado.appendChild(bloco('Confira', rel.avisos, ''));
+    painelResultado.appendChild(h('p', { class: 'aviso-lgpd' }, [icone('alerta'), h('span', {
+      text: 'O arquivo gerado continua sendo dado pessoal (pseudonimizado): o que foi mantido — datas, valores, cidades, listas — é real, e quem tiver o arquivo original consegue ligar as duas versões. ' +
+        'Guarde e compartilhe com o mesmo cuidado, e confira antes de enviar. A tabela de trocas não fica guardada: se gerar de novo, os fictícios serão outros.'
+    })]));
+    painelResultado.hidden = false;
+    piscar(painelResultado);
+  }
 
   function gerar() {
     if (!estado.arquivo) return Promise.resolve(null);
@@ -972,7 +1185,7 @@ function montar(raiz, opcoes) {
   campoColado.addEventListener('keydown', function (e) {
     if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); analisarColado(); }
   });
-  botaoGerar.addEventListener('click', gerar);
+  botaoGerar.addEventListener('click', function () { return estado.modoSaida === 'inteiro' ? gerarInteiro() : gerar(); });
   botaoResumo.addEventListener('click', copiarResumo);
   entrada.addEventListener('change', function () {
     var f = entrada.files && entrada.files[0];
@@ -1028,8 +1241,12 @@ function montar(raiz, opcoes) {
       return analisarColado();
     },
     definirLinhas: definirLinhas,
+    definirModoSaida: definirModoSaida,
+    definirAcao: function (nomeAba, c, acao) { (estado.acoes[nomeAba] = estado.acoes[nomeAba] || {})[c] = acao; if (estado.arquivo) renderizarEstrutura(); },
     escolherDoZip: escolherDoZip,
     gerar: gerar,
+    gerarInteiro: gerarInteiro,
+    resultado: painelResultado,
     copiarResumo: copiarResumo,
     botoes: { gerar: botaoGerar, resumo: botaoResumo, chips: chips }
   };

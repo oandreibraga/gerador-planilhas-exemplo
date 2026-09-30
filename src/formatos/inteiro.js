@@ -123,47 +123,33 @@ async function lerSst(blob, e) {
 }
 
 // ---------- células ----------
-function colunaDe(ref) {
-  var c = 0, i = 0;
-  while (i < ref.length) {
-    var k = ref.charCodeAt(i);
-    if (k >= 65 && k <= 90) c = c * 26 + (k - 64); else if (k >= 97 && k <= 122) c = c * 26 + (k - 96); else break;
-    i++;
-  }
-  return { c: c - 1, r: parseInt(ref.slice(i), 10) - 1 };
-}
 
 // Lê os tokens de uma célula (<c>…</c>) e devolve o essencial.
-function analisarCelula(toks) {
-  var abre = toks[0], attrs = X.atributosEmOrdem(abre.bruto), mapa = {};
+// Célula = tag de abertura + conteúdo capturado até </c> (fórmula, valor, texto em linha, extensões).
+// Dentro de uma célula, "<" só aparece em tags (no texto ele vem escapado), então buscas diretas bastam.
+var RE_F = /<(?:[\w.-]+:)?f(?:\s[^>]*)?(?:\/>|>[\s\S]*?<\/(?:[\w.-]+:)?f>)/;
+var RE_V = /<(?:[\w.-]+:)?v(?:\s[^>]*)?>([\s\S]*?)<\/(?:[\w.-]+:)?v>/;
+var RE_IS = /<(?:[\w.-]+:)?is(?:\s[^>]*)?>([\s\S]*?)<\/(?:[\w.-]+:)?is>/;
+var RE_RPH = /<(?:[\w.-]+:)?rPh[\s>][\s\S]*?<\/(?:[\w.-]+:)?rPh>/g;
+var RE_TEXTO = /<(?:[\w.-]+:)?t(?:\s[^>]*)?>([\s\S]*?)<\/(?:[\w.-]+:)?t>/g;
+var RE_EXT = /<(?:[\w.-]+:)?extLst[\s>][\s\S]*<\/(?:[\w.-]+:)?extLst>/;
+function analisarCelula(abre, conteudo) {
+  var attrs = X.atributosEmOrdem(abre), mapa = {};
   attrs.forEach(function (a) { mapa[X.local(a[0])] = a[1]; });
-  var cel = { attrs: attrs, a: mapa, f: null, v: null, texto: null, outros: [] };
-  var dentro = null, buf = [], emT = false, fonetico = 0;
-  for (var i = 1; i < toks.length - 1; i++) {
-    var t = toks[i], n = t.k === 'abre' || t.k === 'fecha' ? X.local(t.nome) : '';
-    if (!dentro) {
-      if (t.k === 'abre' && (n === 'f' || n === 'v' || n === 'is')) {
-        dentro = n; buf = [t.bruto];
-        if (t.vazio) { if (n === 'f') cel.f = t.bruto; dentro = null; }
-        continue;
-      }
-      if (t.k !== 'texto' || t.bruto.trim()) cel.outros.push(t.bruto);
-      continue;
-    }
-    buf.push(t.bruto);
-    if (dentro === 'v' && t.k === 'texto') cel.v = (cel.v || '') + X.decodificar(t.bruto);
-    if (dentro === 'is') {
-      if (n === 'rPh') fonetico += t.k === 'abre' && !t.vazio ? 1 : t.k === 'fecha' ? -1 : 0;
-      if (n === 't') emT = t.k === 'abre' && !t.vazio;
-      else if (t.k === 'texto' && emT && !fonetico) cel.texto = (cel.texto || '') + X.decodificar(t.bruto);
-    }
-    if (t.k === 'fecha' && n === dentro) {
-      if (dentro === 'f') cel.f = buf.join('');
-      if (dentro === 'is' && cel.texto == null) cel.texto = '';
-      dentro = null;
-    }
+  var f = RE_F.exec(conteudo), v = RE_V.exec(conteudo), is = RE_IS.exec(conteudo), ext = RE_EXT.exec(conteudo);
+  var cel = { attrs: attrs, a: mapa, f: f ? f[0] : null, v: v ? X.decodificar(v[1]) : null, texto: null, outros: ext ? [ext[0]] : [] };
+  if (is) {
+    var semFonetica = is[1].replace(RE_RPH, ''), txt = '', m;
+    RE_TEXTO.lastIndex = 0;
+    while ((m = RE_TEXTO.exec(semFonetica))) txt += X.decodificar(m[1]);
+    cel.texto = txt;
   }
   return cel;
+}
+// Índice do texto compartilhado (<v>n</v>) de uma célula, sem analisar o resto.
+function indiceSst(conteudo) {
+  var v = RE_V.exec(conteudo);
+  return v ? parseInt(v[1], 10) : -1;
 }
 
 // Valor da célula no formato usado pelo resto do app: {t: 's'|'n'|'b'|'e', v}.
@@ -217,6 +203,7 @@ async function processarXlsx(blob, modelo, opcoes) {
   if (!X) iniciar();
   opcoes = opcoes || {};
   var progresso = opcoes.progresso || function () {};
+  var medir = opcoes.medir || function () {}; // medir(etapa): tempos por etapa, para testes de desempenho
   var indice = await Z.indice(blob), porNome = {};
   indice.forEach(function (e) { porNome[e.nome] = e; });
   if (!porNome['[Content_Types].xml'] || !porNome['xl/workbook.xml']) {
@@ -276,39 +263,54 @@ async function processarXlsx(blob, modelo, opcoes) {
   var textosReais = new Set();
   if (sst) sst.textos.forEach(function (t) { if (t) textosReais.add(t); });
   var P = A.pseudonimo.criar({ semente: opcoes.semente, textosReais: textosReais });
+  medir('textos compartilhados');
 
   var planilhas = indice.filter(function (e) { return e.politica === 'planilha'; });
-  var totalBytes = planilhas.reduce(function (s, e) { return s + e.tamanho; }, 0) * 2 || 1, feitos = 0;
+  // Passada única (padrão): os textos compartilhados já são todos os textos reais do arquivo; valores fora deles
+  // são conferidos no fim e, se colidirem com um fictício, a troca é refeita em duas passadas.
+  var passadaUnica = !opcoes.doisPassos && !!sst, tardios = [];
+  var totalBytes = planilhas.reduce(function (s, e) { return s + e.tamanho; }, 0) * (passadaUnica ? 1 : 2) || 1, feitos = 0;
 
-  // Passo 1: registra os valores reais de todas as células que serão trocadas (o arquivo inteiro)
-  for (var k = 0; k < planilhas.length; k++) {
+  // Passo 1: registra os valores reais de todas as células que serão trocadas (o arquivo inteiro) e marca
+  // quais textos compartilhados continuam em uso por células que ficam.
+  var sstMantidos = sst ? new Uint8Array(sst.xml.length) : null;
+  function marcarMantido(conteudo) {
+    var k2 = indiceSst(conteudo);
+    if (k2 >= 0 && k2 < sstMantidos.length) sstMantidos[k2] = 1;
+  }
+  if (passadaUnica) P.registrarFundo(sst.textos);
+  for (var k = 0; !passadaUnica && k < planilhas.length; k++) {
     var regras = regrasPorParte[planilhas[k].nome] || regrasDaAba(null);
-    await percorrerCelulas(blob, planilhas[k], function (cel, r, c) {
-      var val = valorDe(cel, sst);
+    await percorrerCelulas(blob, planilhas[k], regras, function (abre, conteudo, tri) {
+      if (tri.tipo === 's' && sst) {
+        // Caminho rápido (o mais comum): texto compartilhado, lido direto pelo índice
+        var idx = indiceSst(conteudo), valS = idx >= 0 && sst.textos[idx] != null ? { t: 's', v: sst.textos[idx] } : null;
+        if (!tri.analisar || !vaiTrocar(tri.regra, valS)) { marcarMantido(conteudo); return; }
+        if (tri.regra.acao === 'pseudonimizar') P.registrarReal(tri.regra.classe, valS);
+        return;
+      }
+      if (!tri.analisar && tri.tipo !== 'inlineStr') return;
+      var cel = analisarCelula(abre, conteudo), val = valorDe(cel, sst);
       if (val && val.t === 's' && val.sst == null && val.v) textosReais.add(val.v);
-      var regra = regraPara(regras, r, c, val);
-      if (regra && regra.acao === 'pseudonimizar' && val && (val.t === 's' || !TEXTUAIS[regra.classe])) P.registrarReal(regra.classe, val);
+      var regra = tri.analisar ? tri.regra : null;
+      if (!vaiTrocar(regra, val)) { if (tri.tipo === 's' && sst) marcarMantido(conteudo); return; }
+      if (regra.acao === 'pseudonimizar') P.registrarReal(regra.classe, val);
     }, function (n) { feitos += n; progresso(feitos / totalBytes); });
   }
 
-  // Passo 2: monta o arquivo novo
+  medir('passo 1 (valores reais)');
+  // Passo 2: monta o arquivo novo. Os textos compartilhados mantêm os índices; os que não são mais usados por
+  // nenhuma célula que fica viram vazios (nenhum texto antigo sobra) e os fictícios entram no fim.
   var esc = Z.criarEscritor();
-  var novaSst = { xml: [], porAntigo: new Map(), porTexto: new Map(), referencias: 0 };
-  function indiceKept(antigo) {
-    var n = novaSst.porAntigo.get(antigo);
-    if (n === undefined) { n = novaSst.xml.length; novaSst.xml.push(sst.xml[antigo]); novaSst.porAntigo.set(antigo, n); }
-    novaSst.referencias++;
-    return n;
-  }
+  var novosTextos = [], porTexto = new Map(), baseSst = sst ? sst.xml.length : 0;
   var pfxSst = sst && sst.nome.indexOf(':') > 0 ? sst.nome.slice(0, sst.nome.indexOf(':') + 1) : '';
   function indiceNovo(texto) {
-    var n = novaSst.porTexto.get(texto);
+    var n = porTexto.get(texto);
     if (n === undefined) {
-      n = novaSst.xml.length;
-      novaSst.xml.push('<' + pfxSst + 'si><' + pfxSst + 't xml:space="preserve">' + X.escapar(texto) + '</' + pfxSst + 't></' + pfxSst + 'si>');
-      novaSst.porTexto.set(texto, n);
+      n = baseSst + novosTextos.length;
+      novosTextos.push('<' + pfxSst + 'si><' + pfxSst + 't xml:space="preserve">' + X.escapar(texto) + '</' + pfxSst + 't></' + pfxSst + 'si>');
+      porTexto.set(texto, n);
     }
-    novaSst.referencias++;
     return n;
   }
   var relatorio = { abas: [], formulas: 0, removidas: [], avisos: [], imagens: 0, textosSoltos: 0 };
@@ -323,7 +325,8 @@ async function processarXlsx(blob, modelo, opcoes) {
       var rg = regrasPorParte[ent.nome] || regrasDaAba(null);
       var info = { parte: ent.nome, trocadas: 0, formulas: 0 };
       await reescreverPlanilha(blob, ent, esc, {
-        regras: rg, sst: sst, P: P, removidos: idsRemovidos[ent.nome] || {}, info: info, indiceKept: indiceKept, indiceNovo: indiceNovo,
+        regras: rg, sst: sst, P: P, removidos: idsRemovidos[ent.nome] || {}, info: info, indiceNovo: indiceNovo,
+        marcar: sst ? marcarMantido : function () {}, unica: passadaUnica, tardios: tardios,
         progresso: function (n) { feitos += n; progresso(Math.min(0.99, feitos / totalBytes)); }
       });
       relatorio.formulas += info.formulas;
@@ -350,13 +353,28 @@ async function processarXlsx(blob, modelo, opcoes) {
       throw erro('recurso', 'Parte não tratada: ' + ent.nome, ent.nome);
     }
   }
+  if (passadaUnica && P.colisao(tardios)) {
+    // Um valor real que só apareceu no meio do arquivo coincidiu com um fictício: refaz lendo tudo antes
+    return processarXlsx(blob, modelo, Object.assign({}, opcoes, { doisPassos: true }));
+  }
   // Textos compartilhados por último (os índices foram definidos ao reescrever as abas)
   if (sst) {
     var raiz = X.tag(sst.nome, X.atributosEmOrdem(sst.raiz).filter(function (a) { return a[0] !== 'count' && a[0] !== 'uniqueCount'; })
-      .concat([['count', String(novaSst.referencias)], ['uniqueCount', String(novaSst.xml.length)]]), false);
-    var partesSst = ['<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\r\n', raiz].concat(novaSst.xml, ['</' + sst.nome + '>']);
-    await esc.adicionarFluxo('xl/sharedStrings.xml', new Blob(partesSst).stream(), porNome['xl/sharedStrings.xml']);
+      .concat([['uniqueCount', String(baseSst + novosTextos.length)]]), false);
+    var vazio = '<' + pfxSst + 'si><' + pfxSst + 't></' + pfxSst + 't></' + pfxSst + 'si>';
+    var partesSst = ['<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\r\n', raiz];
+    for (var s2 = 0; s2 < baseSst; s2++) partesSst.push(sstMantidos[s2] ? sst.xml[s2] : vazio);
+    partesSst = partesSst.concat(novosTextos, ['</' + sst.nome + '>']);
+    // Junta em blocos de ~1 MB: um Blob com centenas de milhares de pedaços pequenos vira um fluxo lento
+    var blocos = [], atualB = [], tamB = 0;
+    for (var b2 = 0; b2 < partesSst.length; b2++) {
+      atualB.push(partesSst[b2]); tamB += partesSst[b2].length;
+      if (tamB > 1048576) { blocos.push(atualB.join('')); atualB = []; tamB = 0; }
+    }
+    if (atualB.length) blocos.push(atualB.join(''));
+    await esc.adicionarFluxo('xl/sharedStrings.xml', new Blob(blocos).stream(), porNome['xl/sharedStrings.xml']);
   }
+  medir('passo 2 (reescrita)');
   progresso(1);
 
   relatorio.removidas = Object.keys(motivosRemocao);
@@ -373,24 +391,39 @@ function nomeSaida(modelo, ext) {
   return base + '_pseudonimizado.' + ext;
 }
 
-// Percorre as células de uma aba (sem escrever nada): aoCelula(cel, linha, coluna).
-async function percorrerCelulas(blob, e, aoCelula, aoAvanco) {
-  var buf = null, linhaAtual = -1, colAnterior = -1;
+// Triagem rápida de uma célula pela tag de abertura (sem analisar o conteúdo): posição, tipo e regra.
+// `analisar` = a célula talvez mude (ou é fórmula com resultado em texto) e precisa ser lida por inteiro;
+// as demais — a grande maioria — são copiadas como estão.
+var RE_REF = /\sr="([A-Za-z]{1,3})(\d+)"/, RE_TIPO = /\st="([A-Za-z]+)"/;
+function indiceColuna(letras) {
+  var c = 0;
+  for (var i = 0; i < letras.length; i++) c = c * 26 + ((letras.charCodeAt(i) | 32) - 96);
+  return c - 1;
+}
+function triagem(bruto, R, pos) {
+  var m = RE_REF.exec(bruto), tm = RE_TIPO.exec(bruto), tipo = tm ? tm[1] : 'n';
+  if (m) { pos.col = indiceColuna(m[1]); pos.linhaCel = parseInt(m[2], 10) - 1; } else { pos.col++; pos.linhaCel = pos.linha; }
+  var texto = tipo === 's' || tipo === 'inlineStr' || tipo === 'str';
+  var regra = regraPara(R, pos.linhaCel, pos.col, { t: texto ? 's' : 'n' });
+  return {
+    tipo: tipo, r: pos.linhaCel, c: pos.col, regra: regra,
+    analisar: tipo === 'str' || !!(regra && regra.acao !== 'manter' && !(regra.acao === 'pseudonimizar' && TEXTUAIS[regra.classe] && !texto))
+  };
+}
+function vaiTrocar(regra, val) {
+  return !!(regra && regra.acao !== 'manter' && val && !(regra.acao === 'pseudonimizar' && TEXTUAIS[regra.classe] && val.t !== 's'));
+}
+
+// Percorre as células de uma aba (sem escrever nada): aoCelula(tagDeAbertura, conteúdo, triagem).
+async function percorrerCelulas(blob, e, R, aoCelula, aoAvanco) {
+  var abre = null, pos = { linha: -1, col: -1, linhaCel: -1 };
   var leitor = X.criarLeitor(function (t) {
-    var n = t.k === 'abre' || t.k === 'fecha' ? X.local(t.nome) : '';
-    if (buf) {
-      buf.push(t);
-      if (t.k === 'fecha' && n === 'c') { entregar(buf); buf = null; }
-      return;
-    }
-    if (t.k === 'abre' && n === 'row') { var ar = X.atributos(t.bruto); linhaAtual = ar.r ? parseInt(ar.r, 10) - 1 : linhaAtual + 1; colAnterior = -1; }
-    else if (t.k === 'abre' && n === 'c') { if (t.vazio) entregar([t, { k: 'fecha', nome: 'c', bruto: '' }]); else buf = [t]; }
+    if (t.k === 'conteudo') { var a = abre; abre = null; aoCelula(a, t.bruto, triagem(a, R, pos)); return; }
+    if (t.k !== 'abre') return;
+    var n = X.local(t.nome);
+    if (n === 'row') { var ar = /\sr="(\d+)"/.exec(t.bruto); pos.linha = ar ? parseInt(ar[1], 10) - 1 : pos.linha + 1; pos.col = -1; }
+    else if (n === 'c') { if (t.vazio) triagem(t.bruto, R, pos); else { abre = t.bruto; leitor.capturar(t.nome); } }
   });
-  function entregar(toks) {
-    var cel = analisarCelula(toks), pos = cel.a.r ? colunaDe(cel.a.r) : { c: colAnterior + 1, r: linhaAtual };
-    colAnterior = pos.c;
-    aoCelula(cel, pos.r, pos.c);
-  }
   await Z.textoEmPedacos(blob, e, function (s) { leitor.escrever(s); aoAvanco(s.length); });
   leitor.fim();
 }
@@ -398,7 +431,7 @@ async function percorrerCelulas(blob, e, aoCelula, aoAvanco) {
 // Reescreve uma aba em fluxo, trocando as células conforme as regras.
 async function reescreverPlanilha(blob, e, esc, o) {
   var R = o.regras, removidos = o.removidos;
-  var linhaAtual = -1, colAnterior = -1, buf = null, pular = 0, saida = [];
+  var pos = { linha: -1, col: -1, linhaCel: -1 }, abreCel = null, pular = 0, saida = [];
   var ELEMENTOS_REF = { legacyDrawing: 1, legacyDrawingHF: 1, hyperlink: 1 };
 
   function refRemovida(bruto) {
@@ -406,13 +439,25 @@ async function reescreverPlanilha(blob, e, esc, o) {
     for (var k in a) if (X.local(k) === 'id' && removidos[a[k]]) return true;
     return false;
   }
-  function escreverCelula(toks) {
-    var cel = analisarCelula(toks), pos = cel.a.r ? colunaDe(cel.a.r) : { c: colAnterior + 1, r: linhaAtual };
-    colAnterior = pos.c;
-    var val = valorDe(cel, o.sst);
-    var regra = regraPara(R, pos.r, pos.c, val);
-    var trocar = regra && regra.acao !== 'manter' && val && !(regra.acao === 'pseudonimizar' && TEXTUAIS[regra.classe] && val.t !== 's');
-    var nomeC = toks[0].nome, pfx = nomeC.indexOf(':') > 0 ? nomeC.slice(0, nomeC.indexOf(':') + 1) : '';
+  function escreverCelula(abre, nomeC, conteudo) {
+    var tri = triagem(abre, R, pos);
+    if (!tri.analisar) { if (tri.tipo === 's') o.marcar(conteudo); saida.push(abre + conteudo); return; } // fica como está
+    if (tri.tipo === 's' && o.sst && tri.regra.acao === 'pseudonimizar') {
+      // Caminho rápido: texto compartilhado trocado por outro texto; a tag de abertura (estilo etc.) fica igual
+      var idx = indiceSst(conteudo), valS = idx >= 0 && o.sst.textos[idx] != null ? { t: 's', v: o.sst.textos[idx] } : null;
+      if (!vaiTrocar(tri.regra, valS)) { o.marcar(conteudo); saida.push(abre + conteudo); return; }
+      var novoS = o.P.trocar(tri.regra.classe, valS, tri.regra.perfil);
+      if (novoS && novoS.t === 's' && novoS.v != null && novoS.v !== '') {
+        var p0 = nomeC.indexOf(':') > 0 ? nomeC.slice(0, nomeC.indexOf(':') + 1) : '';
+        tri.regra.trocadas++;
+        o.info.trocadas++;
+        saida.push(abre + '<' + p0 + 'v>' + o.indiceNovo(String(novoS.v).slice(0, 32767)) + '</' + p0 + 'v></' + nomeC + '>');
+        return;
+      }
+    }
+    var cel = analisarCelula(abre, conteudo), val = valorDe(cel, o.sst), regra = tri.regra;
+    var trocar = vaiTrocar(regra, val);
+    var pfx = nomeC.indexOf(':') > 0 ? nomeC.slice(0, nomeC.indexOf(':') + 1) : '';
     var attrs = cel.attrs.filter(function (a) { return X.local(a[0]) !== 't'; });
     if (!trocar && cel.f && (cel.a.t === 'str')) {
       // Fórmula com resultado em texto: o resultado guardado pode repetir um dado real (ex.: juntar nome e
@@ -421,13 +466,11 @@ async function reescreverPlanilha(blob, e, esc, o) {
       saida.push(X.tag(nomeC, attrs, false) + cel.f + cel.outros.join('') + '</' + nomeC + '>');
       return;
     }
-    if (!trocar) {
-      // Mantida: só o índice do texto compartilhado muda (a tabela é refeita)
-      if ((cel.a.t || 'n') === 's' && o.sst && cel.v != null) {
-        var novo = String(o.indiceKept(parseInt(cel.v, 10))), alvo = indiceDoTextoV(toks);
-        saida.push(toks.map(function (t, i) { return i === alvo ? novo : t.bruto; }).join(''));
-      } else saida.push(toks.map(function (t) { return t.bruto; }).join(''));
-      return;
+    if (!trocar) { if (cel.a.t === 's') o.marcar(conteudo); saida.push(abre + conteudo); return; }
+    if (o.unica && regra.acao === 'pseudonimizar' && val.sst == null) {
+      // Valor fora dos textos compartilhados (número, texto na célula): registrado agora, conferido no fim
+      o.P.registrarReal(regra.classe, val);
+      o.tardios.push({ classe: regra.classe, cel: val });
     }
     regra.trocadas++;
     o.info.trocadas++;
@@ -448,23 +491,19 @@ async function reescreverPlanilha(blob, e, esc, o) {
   }
 
   var leitor = X.criarLeitor(function (t) {
+    if (t.k === 'conteudo') { var ab = abreCel; abreCel = null; escreverCelula(ab.bruto, ab.nome, t.bruto); return; }
     var n = t.k === 'abre' || t.k === 'fecha' ? X.local(t.nome) : '';
     if (pular) { // dentro de um elemento que está sendo removido
       if (t.k === 'abre' && !t.vazio && n === pularNome) pular++;
       if (t.k === 'fecha' && n === pularNome) pular--;
       return;
     }
-    if (buf) {
-      buf.push(t);
-      if (t.k === 'fecha' && n === 'c') { escreverCelula(buf); buf = null; }
-      return;
-    }
     if (t.k === 'abre' && n === 'c') {
-      if (t.vazio) { saida.push(t.bruto); var p = X.atributos(t.bruto).r; colAnterior = p ? colunaDe(p).c : colAnterior + 1; }
-      else buf = [t];
+      if (t.vazio) { saida.push(t.bruto); triagem(t.bruto, R, pos); }
+      else { abreCel = t; leitor.capturar(t.nome); }
       return;
     }
-    if (t.k === 'abre' && n === 'row') { var ar = X.atributos(t.bruto); linhaAtual = ar.r ? parseInt(ar.r, 10) - 1 : linhaAtual + 1; colAnterior = -1; }
+    if (t.k === 'abre' && n === 'row') { var ar = /\sr="(\d+)"/.exec(t.bruto); pos.linha = ar ? parseInt(ar[1], 10) - 1 : pos.linha + 1; pos.col = -1; }
     // Remove: cabeçalho/rodapé de impressão, cenários (valores de entrada e usuário), filtros ativos (valores
     // filtrados), elementos que apontam para partes removidas; tira textos de exibição dos links que ficam.
     if (t.k === 'abre' && (n === 'headerFooter' || n === 'scenarios' || n === 'filterColumn' || n === 'protectedRanges' || n === 'customProperties' ||
@@ -493,33 +532,29 @@ async function reescreverPlanilha(blob, e, esc, o) {
   });
   var pularNome = '', links = null;
 
-  var entrada = await Z.fluxo(blob, e);
-  var transformado = entrada.pipeThrough(new TextDecoderStream()).pipeThrough(new TransformStream({
+  // Uma etapa só: bytes → texto → reescrita → bytes (menos etapas de fluxo = menos custo por pedaço)
+  var entrada = await Z.fluxo(blob, e), dec = new TextDecoder('utf-8'), enc = new TextEncoder();
+  function descarregar(ctl) { if (saida.length) { ctl.enqueue(enc.encode(saida.join(''))); saida = []; } }
+  var transformado = entrada.pipeThrough(new TransformStream({
     transform: function (pedaco, ctl) {
-      leitor.escrever(pedaco);
-      o.progresso(pedaco.length);
-      if (saida.length) { ctl.enqueue(saida.join('')); saida = []; }
+      var s = dec.decode(pedaco, { stream: true });
+      leitor.escrever(s);
+      o.progresso(s.length);
+      descarregar(ctl);
     },
     flush: function (ctl) {
+      var s = dec.decode();
+      if (s) leitor.escrever(s);
       leitor.fim();
-      if (saida.length) { ctl.enqueue(saida.join('')); saida = []; }
+      descarregar(ctl);
     }
-  })).pipeThrough(new TextEncoderStream());
+  }));
   try {
     await esc.adicionarFluxo(e.nome, transformado, e);
   } catch (err) {
     if (err && err.amigavel) throw err;
     throw erro('corrompido', 'O arquivo pode estar danificado. Tente abrir no Excel e salvar de novo como .xlsx.', e.nome + ': ' + ((err && err.message) || err));
   }
-}
-
-function indiceDoTextoV(toks) {
-  for (var i = 1; i < toks.length; i++) {
-    if (toks[i].k === 'abre' && X.local(toks[i].nome) === 'v' && !toks[i].vazio) {
-      for (var j = i + 1; j < toks.length; j++) if (toks[j].k === 'texto') return j;
-    }
-  }
-  return -1;
 }
 
 function numeroXml(v) {

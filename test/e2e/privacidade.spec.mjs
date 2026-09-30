@@ -140,3 +140,30 @@ test('arquivo offline: o botão de baixar não aparece (já é a versão sem int
   await abrirApp(page, MODOS[1].url);
   await expect(page.getByRole('link', { name: 'Baixar para usar sem internet' })).toHaveCount(0);
 });
+
+test('arquivo inteiro pelo site: dados trocados no Worker, sem rede, sem violação de CSP e sem sobrar canário', async ({ page, context }, info) => {
+  test.setTimeout(240000);
+  const fs = await import('node:fs');
+  const path = await import('node:path');
+  const { vazamentosInteiro } = await import('./apoio.mjs');
+  const rede = await vigiarRede(context, MODOS[0].url);
+  await registrarViolacoes(context);
+  await abrirApp(page, MODOS[0].url);
+  await carregarPlanilha(page, 'vendas_exemplo.xlsx');
+  await esperarEstrutura(page);
+  await page.getByText('Arquivo inteiro com dados trocados').click();
+  await expect(page.locator('select.sel-acao').first()).toBeVisible();
+  const [download] = await Promise.all([
+    page.waitForEvent('download', { timeout: 200000 }),
+    page.getByRole('button', { name: /Gerar arquivo com dados trocados/ }).click()
+  ]);
+  expect(download.suggestedFilename()).toBe('vendas_exemplo_pseudonimizado.xlsx');
+  const destino = path.join(info.outputDir, download.suggestedFilename());
+  await download.saveAs(destino);
+  const bytes = fs.readFileSync(destino);
+  expect(await vazamentosInteiro(bytes, 'vendas_exemplo.xlsx')).toEqual([]);
+  await expect(page.locator('#app')).toHaveAttribute('data-leitura', 'trabalhador');
+  await expect(page.locator('section.resultado')).toContainText('pseudonimizado');
+  expect(await violacoes(page)).toEqual([]);
+  expect(rede.externos()).toEqual([]);
+});

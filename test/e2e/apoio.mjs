@@ -66,3 +66,9 @@ export async function baixarAmostra(page, pasta) {
 export async function vazamentos(bytes, nomeFixtura) {
   return varrerXlsx(bytes, canarios()[nomeFixtura], JSZip);
 }
+
+// Arquivo inteiro: canários de todas as linhas das colunas trocadas por padrão
+export const canariosInteiro = () => JSON.parse(fs.readFileSync(fixtura('canarios-inteiro.json'), 'utf8'));
+export async function vazamentosInteiro(bytes, nomeFixtura) {
+  return varrerXlsx(bytes, canariosInteiro()[nomeFixtura], JSZip);
+}

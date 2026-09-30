@@ -4,6 +4,13 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/); 
 
 ## [Não publicado]
 
+## [3.2.0]
+
+### Adicionado
+- **Arquivo inteiro com dados trocados** (pseudonimização) para `.xlsx`, `.xlsm` e `.csv`: todas as linhas, com nomes, documentos, e-mails, telefones, endereços, códigos e textos trocados por fictícios consistentes (o mesmo valor vira sempre o mesmo fictício, em todas as abas); o resto fica como está. Escolha por coluna: trocar, manter, generalizar ou apagar. O arquivo é editado por dentro, em fluxo: formatação, fórmulas, larguras, mesclagens e imagens ficam; metadados, comentários, macros, links e tabelas dinâmicas saem; recursos que ainda não são tratados com segurança fazem o arquivo ser recusado com explicação. Relatório no fim, sem mostrar nenhum valor real.
+- Listas extras de nomes e sobrenomes (montadas para o projeto) para ter fictícios suficientes em arquivos grandes.
+- Desempenho: 67 mil linhas × 86 colunas em cerca de 1 minuto, com menos de 1,5 GB de memória.
+
 ## [3.1.0]
 
 ### Adicionado

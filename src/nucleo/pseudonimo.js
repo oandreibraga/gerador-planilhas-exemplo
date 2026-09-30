@@ -66,10 +66,65 @@ function criar(opcoes) {
     return listas;
   }
 
+  // Caches por texto exato: no arquivo inteiro o mesmo valor aparece muitas vezes, escrito do mesmo jeito.
+  var cacheChave = {}, cacheSaida = {};
+  function chaveRapida(classe, cel) {
+    var m = cacheChave[classe] || (cacheChave[classe] = new Map()), id = cel.t + textoDe(cel);
+    var k = m.get(id);
+    if (k === undefined) { k = chave(classe, cel); m.set(id, k); }
+    return k;
+  }
   function registrarReal(classe, cel) {
-    var k = chave(classe, cel);
+    var k = chaveRapida(classe, cel);
     if (k != null) reais[classe].add(k);
     else if (classe !== 'codigo') { var kc = chave('codigo', cel); if (kc) reais.codigo.add(kc); }
+  }
+
+  // Textos reais "de fundo": todos os textos compartilhados do arquivo, registrados de uma vez para todas as
+  // classes (um superconjunto dos reais de cada classe). Assim a troca é feita numa passada só pelas abas.
+  var fundo = { normalizados: new Set(), minusculos: new Set(), maiusculos: new Set(), digitos: new Set() };
+  function registrarFundo(textos) {
+    for (var i = 0; i < textos.length; i++) {
+      var s = textos[i] == null ? '' : String(textos[i]).trim();
+      if (!s) continue;
+      fundo.normalizados.add(U.normalizar(s));
+      fundo.minusculos.add(s.toLowerCase());
+      fundo.maiusculos.add(s.toUpperCase());
+      var d = soDigitos(s);
+      if (d.length >= 8) {
+        fundo.digitos.add(d);
+        if (d.length >= 12 && d.slice(0, 2) === '55') fundo.digitos.add(d.slice(2));
+        if (d.length === 11 && d.charAt(0) === '0') fundo.digitos.add(d.slice(1));
+      }
+      var an = s.replace(/[^0-9A-Za-z]/g, '').toUpperCase();
+      if (an.length === 14) fundo.digitos.add(an);
+    }
+  }
+  function noFundo(classe, k) {
+    if (MASCARA[classe] || classe === 'telefone') return fundo.digitos.has(k);
+    if (classe === 'email') return fundo.minusculos.has(k);
+    if (classe === 'codigo') return fundo.maiusculos.has(k);
+    return fundo.normalizados.has(k);
+  }
+
+  // Na passada única, um valor real fora dos textos compartilhados (número, texto na própria célula) só é
+  // conhecido quando aparece. Se ele for igual a um fictício já usado, ou estiver contido num fictício de texto,
+  // a troca é refeita em duas passadas (lendo todos os reais antes). Devolve true se houve colisão.
+  function colisao(tardios) {
+    var textosTardios = [];
+    for (var i = 0; i < tardios.length; i++) {
+      var c = tardios[i].classe, k = chave(c, tardios[i].cel);
+      if (k == null) { c = 'codigo'; k = chave('codigo', tardios[i].cel); }
+      if (k != null && usados[c].has(k)) return true;
+      if (tardios[i].cel.t === 's') textosTardios.push(textoDe(tardios[i].cel));
+    }
+    if (!textosTardios.length) return false;
+    var ctxTardio = { textosReais: new Set(textosTardios) }, achou = false;
+    ['pessoa', 'empresa', 'endereco', 'bairro', 'cidade', 'texto'].forEach(function (c) {
+      if (achou) return;
+      mapas[c].forEach(function (base) { if (!achou && G.vazouTexto(ctxTardio, base)) achou = true; });
+    });
+    return achou;
   }
 
   // Sorteia até achar um fictício livre (não usado e diferente de qualquer real). `gerar(tentativa)` devolve
@@ -78,7 +133,7 @@ function criar(opcoes) {
     for (var t = 0; t < 400; t++) {
       var r = gerar(t);
       if (!r) continue;
-      if (usados[classe].has(r.chave) || reais[classe].has(r.chave)) continue;
+      if (usados[classe].has(r.chave) || reais[classe].has(r.chave) || noFundo(classe, r.chave)) continue;
       if (r.texto && G.vazouTexto(ctx, r.texto)) continue;
       usados[classe].add(r.chave);
       return r.base;
@@ -275,14 +330,21 @@ function criar(opcoes) {
   // Troca uma célula. `perfil` (opcional) é o perfil da coluna (modelos de código). Célula vazia fica vazia.
   function trocar(classe, cel, perfil) {
     if (!cel || cel.v == null || textoDe(cel).trim() === '') return cel;
-    var real = textoDe(cel), k = chave(classe, cel), c = classe;
-    if (k == null) { c = 'codigo'; k = chave('codigo', cel); } // CPF com dígitos a menos etc.: troca como código
+    var real = textoDe(cel), id = cel.t + (cel.z || '') + '|' + real;
+    var mc = cacheSaida[classe] || (cacheSaida[classe] = new Map()), pronto = mc.get(id);
+    if (pronto) { contagem[pronto.classe].ocorrencias++; return pronto.cel; }
+    var k = chaveRapida(classe, cel), c = classe;
+    if (k == null) { c = 'codigo'; k = chaveRapida('codigo', cel); } // CPF com dígitos a menos etc.: troca como código
     contagem[c].ocorrencias++;
-    return desenhar(c, cel, real, baseDe(c, k, real, perfil));
+    var saida = desenhar(c, cel, real, baseDe(c, k, real, perfil));
+    mc.set(id, { classe: c, cel: saida });
+    return saida;
   }
 
   return {
     registrarReal: registrarReal,
+    registrarFundo: registrarFundo,
+    colisao: colisao,
     trocar: trocar,
     estatisticas: function () {
       var r = {};

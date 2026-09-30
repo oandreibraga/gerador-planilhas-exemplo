@@ -44,9 +44,27 @@ function criarLeitor(aoToken) {
     return -1;
   }
 
+  // Captura: depois de uma tag de abertura, quem lê pode pedir o conteúdo inteiro até o fechamento, num só
+  // token { k: 'conteudo', bruto } (inclui a tag de fechamento). Serve para as células de uma aba, que são
+  // pequenas, muitas e simples: evita um objeto por pedaço de XML. Só para elementos sem CDATA/comentários.
+  var captura = null;
+  var LIMITE_CAPTURA = 16 * 1024 * 1024;
+
   function processar(s, final) {
     var i = 0;
     while (i < s.length) {
+      if (captura) {
+        var j = s.indexOf(captura, i);
+        if (j < 0) {
+          if (final || s.length - i > LIMITE_CAPTURA) throw erroXml('elemento sem fechamento: ' + captura);
+          return s.slice(i);
+        }
+        var fimC = j + captura.length;
+        captura = null;
+        aoToken({ k: 'conteudo', bruto: s.slice(i, fimC) });
+        i = fimC;
+        continue;
+      }
       var lt = s.indexOf('<', i);
       if (lt < 0) {
         // Texto até o fim do pedaço: guarda o final se puder ser o começo de uma entidade partida (&am…)
@@ -68,6 +86,8 @@ function criarLeitor(aoToken) {
   }
 
   return {
+    // Chamado de dentro do aoToken de uma tag de abertura (não vazia): o próximo token é o conteúdo inteiro.
+    capturar: function (nome) { captura = '</' + nome + '>'; },
     escrever: function (pedaco) { resto = processar(resto + pedaco, false); },
     fim: function () { resto = processar(resto, true); if (resto) aoToken({ k: 'texto', bruto: resto }); resto = ''; }
   };
@@ -109,8 +129,11 @@ function decodificar(s) {
 }
 
 // Texto seguro para o conteúdo de um elemento ou atributo. Tira caracteres que o XML não aceita.
+var RE_ESPECIAL = /[&<>"\u0000-\u0008\u000B\u000C\u000E-\u001F\uFFFE\uFFFF]/; // eslint-disable-line no-control-regex
 function escapar(s) {
-  return String(s)
+  s = String(s);
+  if (!RE_ESPECIAL.test(s)) return s; // caminho rápido: quase todo texto não precisa de escape
+  return s
     .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F￾￿]/g, '') // eslint-disable-line no-control-regex
     .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }

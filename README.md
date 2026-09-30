@@ -2,6 +2,11 @@
 
 Cria uma cópia da sua planilha com **dados inventados**, mantendo a mesma estrutura: abas, colunas, posição do cabeçalho, tipos e formatos das células. Serve para pedir uma automação, tirar uma dúvida ou mostrar um problema para alguém (outra equipe, um fornecedor, uma IA) **sem mandar os dados reais**.
 
+Dois modos:
+
+- **Amostra fictícia:** 10, 20 ou 30 linhas inventadas com a mesma estrutura.
+- **Arquivo inteiro com dados trocados** (novo): todas as linhas; nomes, documentos, e-mails e telefones viram fictícios (o mesmo valor vira sempre o mesmo fictício, em todas as abas), e o resto fica como está. Para testar sistemas com volume de verdade.
+
 - **Roda só no seu navegador.** A planilha não sai do seu computador: a página não faz nenhuma conexão com a internet, e isso é testado automaticamente em Chrome, Firefox e Safari (WebKit).
 - **Um arquivo só.** O mesmo arquivo funciona pelo site ou baixado, sem internet e sem instalar nada.
 - **Entende o que cada coluna significa:** nomes, CPF/CNPJ (com dígito verificador válido), e-mail, telefone, CEP, cidade e UF (cidades reais do IBGE, nunca as do original), chave de NF-e, datas, valores, percentuais, listas de status e colunas calculadas a partir de outras.
@@ -13,7 +18,9 @@ Cria uma cópia da sua planilha com **dados inventados**, mantendo a mesma estru
 1. Abra o site (https://oandreibraga.github.io/gerador-planilhas-exemplo/) ou, para usar sem internet, clique em **Baixar para usar sem internet** no próprio site: vem um `.zip`; descompacte e abra o `gerador-planilhas-exemplo.html` no navegador, sem instalar nada. O mesmo pacote está na página de [Releases](../../releases).
 2. Escolha a planilha (`.xlsx`, `.xlsm`, `.xls`, `.xlsb`, `.ods`, `.csv` ou um `.zip` com planilhas). Se só tiver os títulos das colunas, cole-os na aba "Só tenho os títulos das colunas".
 3. Confira o tipo que a ferramenta identificou em cada coluna e corrija se precisar.
-4. Escolha 10, 20 ou 30 linhas e clique em **Baixar planilha de exemplo**. O arquivo sai como `<nome original>_amostra.xlsx`.
+4. Escolha o que gerar:
+   - **Amostra fictícia:** escolha 10, 20 ou 30 linhas e clique em **Baixar planilha de exemplo**. O arquivo sai como `<nome original>_amostra.xlsx`.
+   - **Arquivo inteiro com dados trocados** (`.xlsx`, `.xlsm` e `.csv`): confira o que fazer com cada coluna (trocar por fictício, manter, generalizar ou apagar) e clique em **Gerar arquivo com dados trocados**. O arquivo sai como `<nome original>_pseudonimizado.xlsx` (ou `.csv`), e a tela mostra um relatório do que foi trocado e tirado.
 
 O botão **Copiar descrição das colunas** gera um texto com a estrutura (abas, colunas, tipos, formatos) para colar num pedido de automação.
 
@@ -26,6 +33,18 @@ O botão **Copiar descrição das colunas** gera um texto com a estrutura (abas,
 | **Mantido** | Formatos das células (moeda, data, percentual…), larguras, células mescladas, abas ocultas e a posição do cabeçalho (textos acima dele, como o título de um relatório, viram um texto genérico) |
 
 A análise usa até 500 linhas de cada aba (as primeiras); o arquivo gerado tem só as linhas de exemplo.
+
+### Arquivo inteiro com dados trocados
+
+| No arquivo gerado | |
+|---|---|
+| **Trocado por fictício** (padrão) | Nomes de pessoas e empresas, CPF, CNPJ, chaves de acesso, e-mails, telefones, CEP, endereços, bairros, códigos e textos livres — sempre o mesmo fictício para o mesmo valor, em todas as abas; formato de cada ocorrência mantido (máscara, maiúsculas) |
+| **Igual ao original** (padrão) | Datas, valores, quantidades, cidades, UF, listas curtas, colunas 0/1, títulos das colunas e nomes das abas. Cada coluna pode ser trocada, mantida, generalizada (data → dia 1 do mês; número → 2 algarismos) ou apagada |
+| **Mantido intacto** | Formatação, estilos, larguras, mesclagens, validações, fórmulas (recalculadas ao abrir), imagens, gráficos (sem os valores guardados) |
+| **Tirado do arquivo** | Autor, empresa e caminho do arquivo; comentários; miniatura; macros; links externos; vínculos com outros arquivos; tabelas dinâmicas; cabeçalho e rodapé de impressão. Textos fora das tabelas (títulos, notas, caixas de texto) viram textos inventados |
+| **Recusado** (com explicação) | Conexões de dados (Power Query), modelo de dados (Power Pivot), segmentações, controles de formulário, objetos incorporados e qualquer parte que a ferramenta não conhece |
+
+O arquivo gerado continua sendo **dado pessoal pseudonimizado** (LGPD, art. 13): veja [PRIVACIDADE.md](PRIVACIDADE.md).
 
 ### Conferir o arquivo baixado
 

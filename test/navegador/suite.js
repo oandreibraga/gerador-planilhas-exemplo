@@ -736,6 +736,53 @@ function testarColado() {
     JSON.stringify(arq2.abas[0].colunas.map(function (c) { return c.nome; })));
 }
 
+async function testarArquivoInteiro(fx) {
+  var palco = document.getElementById('palco');
+  palco.textContent = '';
+  var capturado = null;
+  var api = A.app.montar(palco, { semEventosGlobais: true, baixar: function (nome, dados) { capturado = { nome: nome, dados: dados }; } });
+  await api.carregarBytes(fx.fretes.nome, fx.fretes.bytes);
+  var radioInteiro = palco.querySelector('input.modo-radio[value="inteiro"]');
+  checar('arquivo inteiro: opção disponível para .xlsx', !!radioInteiro && !radioInteiro.disabled);
+  radioInteiro.checked = true;
+  radioInteiro.dispatchEvent(new Event('change'));
+  var acoes = palco.querySelectorAll('select.sel-acao');
+  var cabecalho = palco.querySelector('thead th:last-child');
+  checar('arquivo inteiro: tabela mostra "O que fazer" em cada coluna, sem "usar reais"', acoes.length === 24 && !palco.querySelector('input.chk-manter') &&
+    !!cabecalho && cabecalho.textContent === 'O que fazer', 'seletores: ' + acoes.length);
+  checar('arquivo inteiro: barra sem a escolha de 10/20/30 e botão "Gerar arquivo com dados trocados"',
+    palco.querySelector('.qtd').hidden && /Gerar arquivo com dados trocados/.test(api.botoes.gerar.textContent), api.botoes.gerar.textContent);
+  var linhaPlaca = Array.prototype.filter.call(palco.querySelectorAll('tbody tr'), function (tr) { return /Placa/.test(tr.textContent); })[0];
+  var selPlaca = linhaPlaca && linhaPlaca.querySelector('select.sel-acao');
+  checar('arquivo inteiro: código (placa) vem marcado para trocar', !!selPlaca && selPlaca.value === 'pseudonimizar', selPlaca ? selPlaca.value : 'sem linha');
+  if (selPlaca) { selPlaca.value = 'manter'; selPlaca.dispatchEvent(new Event('change')); }
+  checar('arquivo inteiro: manter uma coluna sensível destaca a linha', !!linhaPlaca && linhaPlaca.classList.contains('manter'));
+  await api.gerarInteiro();
+  checar('arquivo inteiro: arquivo entregue com o nome certo', !!capturado && capturado.nome === 'fretes_exemplo_pseudonimizado.xlsx', capturado ? capturado.nome : 'nada baixado');
+  if (capturado) {
+    var bytes = new Uint8Array(await capturado.dados.arrayBuffer());
+    var wb = XLSX.read(bytes, { type: 'array' }), orig = XLSX.read(fx.fretes.bytes, { type: 'array' });
+    var a = XLSX.utils.sheet_to_json(orig.Sheets.Fretes, { header: 1 }), b = XLSX.utils.sheet_to_json(wb.Sheets.Fretes, { header: 1 });
+    var iCidade = a[0].indexOf('Cid Origem Prestação'), iPlaca = a[0].indexOf('Placa'), iChave = a[0].indexOf('Chave CT-e');
+    var mudouChave = true, manteveCidade = true, mantevePlaca = true;
+    for (var i = 1; i < a.length; i++) {
+      if (a[i][iChave] && a[i][iChave] === b[i][iChave]) mudouChave = false;
+      if (a[i][iCidade] !== b[i][iCidade]) manteveCidade = false;
+      if (a[i][iPlaca] !== b[i][iPlaca]) mantevePlaca = false;
+    }
+    checar('arquivo inteiro: mesmas linhas; chave trocada; cidade (padrão) e placa (escolha) mantidas',
+      b.length === a.length && mudouChave && manteveCidade && mantevePlaca, 'linhas ' + b.length + '/' + a.length);
+  }
+  var resultado = api.resultado;
+  checar('arquivo inteiro: resultado mostra o que foi trocado e o aviso de dado pseudonimizado',
+    !resultado.hidden && /chaves de acesso/.test(resultado.textContent) && /pseudonimizado/.test(resultado.textContent), resultado.textContent.slice(0, 160));
+  await api.analisarColado('Nome\tCPF\r\n', 'P', 'x');
+  var radio2 = palco.querySelector('input.modo-radio[value="inteiro"]');
+  checar('arquivo inteiro: indisponível quando só há os títulos colados (com explicação)',
+    !!radio2 && radio2.disabled && !palco.querySelector('.modo-aviso').hidden);
+  palco.textContent = '';
+}
+
 async function testarInterface(fx) {
   var palco = document.getElementById('palco');
   palco.textContent = '';
@@ -1007,6 +1054,9 @@ async function executarTudo() {
       grupoAtual = 'Interface (mesmo código do gerador-amostra.html)';
       placar.textContent = 'Executando: interface…';
       try { await testarInterface(fx); } catch (e) { reg('falhou', 'erro inesperado nesta etapa', msgErro(e)); }
+      grupoAtual = 'Interface: arquivo inteiro com dados trocados';
+      placar.textContent = 'Executando: arquivo inteiro…';
+      try { await testarArquivoInteiro(fx); } catch (e) { reg('falhou', 'erro inesperado nesta etapa', msgErro(e)); }
     }
   }
   etapa('Sem acesso à rede', testarRede);

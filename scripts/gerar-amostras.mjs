@@ -19,4 +19,10 @@ for (const def of [fx.vendas, fx.fretes, fx.csv, fx.xls]) {
     total++;
   }
 }
+// Arquivo inteiro com dados trocados (modo pseudonimização)
+for (const def of [fx.vendas, fx.fretes]) {
+  const r = await A.inteiro.processar(new Blob([def.bytes]), def.nome, abrir(def.nome, def.bytes), { semente: 7 });
+  fs.writeFileSync(path.join(destino, r.nome), new Uint8Array(await r.blob.arrayBuffer()));
+  total++;
+}
 console.log(total + ' amostras em ' + destino);

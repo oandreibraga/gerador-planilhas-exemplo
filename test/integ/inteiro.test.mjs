@@ -195,3 +195,11 @@ test('arquivo inteiro (.csv): mesmo separador, codificação e linhas; sensível
   assert.deepEqual(vazou.slice(0, 5), []);
   assert.equal(r.nome, 'contatos_exemplo_pseudonimizado.csv');
 });
+
+test('arquivo inteiro: modo de duas passadas (usado quando há colisão) também não deixa canário', { timeout: 120000 }, async () => {
+  const fx = fixtures();
+  const { r, bytes } = await processar(fx.vendas.nome, fx.vendas.bytes, { doisPassos: true });
+  const vazamentos = await varrerXlsx(bytes, canariosPseudonimo(fx.vendas), JSZip);
+  assert.deepEqual(vazamentos.slice(0, 10), [], vazamentos.length + ' vazamento(s)');
+  assert.equal(r.relatorio.abas.find((a) => a.nome === 'Movimentos').colunas.find((c) => c.nome === 'Histórico').trocadas, 20000);
+});

@@ -105,3 +105,19 @@ test('pseudônimo: sementes diferentes dão fictícios diferentes (não dá para
   const semSemente2 = A.pseudonimo.criar().trocar('cpf', s('529.982.247-25')).v;
   assert.notEqual(semSemente1, semSemente2, 'sem semente fixa, cada execução sorteia outros fictícios');
 });
+
+test('pseudônimo: passada única detecta um real que aparece depois e coincide com um fictício', () => {
+  const P = A.pseudonimo.criar({ semente: 21 });
+  P.registrarFundo(['529.982.247-25', 'Maria Souza']);
+  const fict = P.trocar('cpf', s('529.982.247-25')).v.replace(/\D/g, '');
+  assert.notEqual(fict, '52998224725');
+  assert.equal(P.colisao([{ classe: 'cpf', cel: { t: 'n', v: 12345678909 } }]), false, 'real tardio diferente: sem colisão');
+  assert.equal(P.colisao([{ classe: 'cpf', cel: { t: 'n', v: Number(fict) } }]), true, 'real tardio igual ao fictício: colisão');
+  const nome = P.trocar('pessoa', s('Maria Souza')).v;
+  const trecho = nome.split(' ').slice(0, 2).join(' ');
+  assert.equal(P.colisao([{ classe: 'texto', cel: s(trecho) }]), trecho.length >= 5, 'texto tardio contido num fictício');
+  // O fundo evita que o fictício repita qualquer texto já conhecido do arquivo
+  const Q = A.pseudonimo.criar({ semente: 22 });
+  Q.registrarFundo(['Otávio Mesquita Rolim']);
+  for (let i = 0; i < 300; i++) assert.notEqual(U.normalizar(Q.trocar('pessoa', s('Pessoa ' + i)).v), U.normalizar('Otávio Mesquita Rolim'));
+});

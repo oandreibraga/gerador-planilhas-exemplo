@@ -24,7 +24,11 @@ export function rodar({ html, limiteMs = 240000 } = {}) {
         // APIs do navegador que o jsdom não expõe dentro da janela
         if (!w.TextDecoder) w.TextDecoder = TextDecoder;
         if (!w.TextEncoder) w.TextEncoder = TextEncoder;
-        if (!w.DecompressionStream) w.DecompressionStream = DecompressionStream;
+        for (const nome of ['DecompressionStream', 'CompressionStream', 'TextDecoderStream', 'TextEncoderStream', 'TransformStream', 'ReadableStream', 'WritableStream']) {
+          if (!w[nome]) w[nome] = globalThis[nome];
+        }
+        // O Blob do jsdom não tem stream(); o do Node tem (o arquivo inteiro é lido e montado em fluxo)
+        if (!w.Blob || !w.Blob.prototype.stream) w.Blob = Blob;
         if (!w.crypto || !w.crypto.getRandomValues) Object.defineProperty(w, 'crypto', { value: webcrypto, configurable: true });
       }
     });

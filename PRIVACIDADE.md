@@ -29,6 +29,17 @@ Por isso, **a amostra não é uma versão anonimizada da sua planilha.** Título
 
 O botão "Copiar descrição das colunas" gera um texto com: nome do arquivo, nomes das abas, títulos das colunas, tipo e formato de cada coluna, quantidades de linhas, as opções das listas curtas (com o percentual de cada uma) e os valores fixos. **Não traz os valores das demais colunas.** Leia o texto antes de colar em outro lugar.
 
+## Arquivo inteiro com dados trocados
+
+Neste modo, o arquivo todo é processado no seu computador e sai com a mesma estrutura e o mesmo número de linhas:
+
+- **Trocados por fictícios (padrão):** nomes de pessoas e empresas, CPF, CNPJ, chaves de acesso, e-mails, telefones, CEP, endereços, bairros, códigos e textos livres. O mesmo valor vira sempre o mesmo fictício, em todas as abas, e dois valores diferentes nunca viram o mesmo fictício. O fictício nunca é igual a um valor real do arquivo.
+- **Mantidos (padrão):** datas, valores, quantidades, cidades, UF, listas curtas, títulos das colunas e nomes das abas. Você escolhe, coluna a coluna, trocar, manter, generalizar ou apagar.
+- **Tirados:** autor, empresa e caminho do arquivo; comentários e seus autores; miniatura; macros; links para sites e e-mails; vínculos com outros arquivos; tabelas dinâmicas; cabeçalho e rodapé de impressão; resultados guardados de fórmulas de texto e valores guardados dos gráficos. Textos fora das tabelas (títulos, notas, caixas de texto, títulos de gráficos) viram textos inventados.
+- **Recusados:** arquivos com conexões de dados, modelo de dados, segmentações, controles, objetos incorporados ou partes desconhecidas não são processados — a ferramenta não deixa passar o que não sabe tratar.
+- **Sem mapa guardado:** a tabela "valor real → fictício" existe só na memória, durante o processamento, e é descartada. Os fictícios são sorteados de novo a cada execução, sem depender do valor real (não dá para descobrir o original testando palpites).
+- **Limites:** imagens são mantidas como estão (confira se não mostram dados); textos literais dentro de fórmulas e de regras de validação não são trocados; um nome escrito no meio de um texto de uma coluna mantida continua lá. A detecção de dados dentro de textos livres é a próxima etapa.
+
 ## Linguagem e LGPD
 
 - Esta ferramenta **não** promete "anonimização conforme a LGPD". Anonimização, no sentido da lei (art. 12), exige que a pessoa não possa mais ser identificada por meios razoáveis. Quem decide se um arquivo pode ser compartilhado é você e a sua organização.
