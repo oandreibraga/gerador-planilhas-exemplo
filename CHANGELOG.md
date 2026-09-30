@@ -4,6 +4,11 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/); 
 
 ## [Não publicado]
 
+## [3.1.0]
+
+### Adicionado
+- Botão "Baixar para usar sem internet" no site: um `.zip` com a ferramenta (o mesmo arquivo do site), um LEIA-ME em português, os hashes para conferir e as licenças. O pacote também vai em cada Release, com atestado de proveniência, e a verificação semanal confere que o `.zip` do site é o da Release.
+
 ## [3.0.0]
 
 Primeira versão pública.

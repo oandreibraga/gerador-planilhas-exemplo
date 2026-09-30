@@ -17,10 +17,11 @@ export const MODOS = [
 ];
 
 // Registra toda requisição do contexto (páginas e Workers) e bloqueia qualquer uma que não seja
-// o próprio documento: se o app tentar sair para a rede, o teste vê e nada chega a sair do CI.
-export async function vigiarRede(context, urlPagina) {
+// o próprio documento (e os `extras`, como o .zip que a pessoa escolhe baixar): se o app tentar sair para a rede,
+// o teste vê e nada chega a sair do CI.
+export async function vigiarRede(context, urlPagina, extras = []) {
   const pedidos = [];
-  const permitido = (u) => u === urlPagina || u.startsWith('blob:') || u.startsWith('data:');
+  const permitido = (u) => u === urlPagina || extras.includes(u) || u.startsWith('blob:') || u.startsWith('data:');
   context.on('request', (r) => pedidos.push(r.url()));
   await context.route('**/*', (route) => (permitido(route.request().url()) ? route.continue() : route.abort('blockedbyclient')));
   return { externos: () => pedidos.filter((u) => !permitido(u)) };

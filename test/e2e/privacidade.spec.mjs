@@ -2,7 +2,7 @@
 // não faz nenhuma requisição, não viola a própria CSP, funciona sem internet e não vaza os canários.
 import { test, expect } from '@playwright/test';
 import {
-  MODOS, vigiarRede, registrarViolacoes, violacoes, abrirApp, carregarPlanilha, esperarEstrutura, baixarAmostra, vazamentos
+  MODOS, raiz, vigiarRede, registrarViolacoes, violacoes, abrirApp, carregarPlanilha, esperarEstrutura, baixarAmostra, vazamentos
 } from './apoio.mjs';
 
 for (const modo of MODOS) {
@@ -114,4 +114,27 @@ test('arquivo que trava a biblioteca de leitura: o vigia interrompe e mostra men
   await esperarEstrutura(page);
   await expect(page.locator('#app')).toHaveAttribute('data-leitura', 'trabalhador');
   expect(rede.externos()).toEqual([]);
+});
+
+test('site: botão baixa o pacote .zip com o mesmo arquivo do site; no arquivo offline o botão não aparece', async ({ page, context }, info) => {
+  const JSZip = (await import('jszip')).default;
+  const crypto = await import('node:crypto');
+  const fs = await import('node:fs');
+  const path = await import('node:path');
+  const rede = await vigiarRede(context, MODOS[0].url, [MODOS[0].url + 'gerador-planilhas-exemplo.zip']);
+  await abrirApp(page, MODOS[0].url);
+  const botao = page.getByRole('link', { name: 'Baixar para usar sem internet' });
+  await expect(botao).toBeVisible();
+  const [download] = await Promise.all([page.waitForEvent('download'), botao.click()]);
+  expect(download.suggestedFilename()).toBe('gerador-planilhas-exemplo.zip');
+  const destino = path.join(info.outputDir, 'pacote.zip');
+  await download.saveAs(destino);
+  const zip = await JSZip.loadAsync(fs.readFileSync(destino));
+  const doZip = await zip.file('gerador-planilhas-exemplo.html').async('nodebuffer');
+  const doSite = fs.readFileSync(path.join(raiz, 'dist/index.html'));
+  expect(crypto.createHash('sha256').update(doZip).digest('hex')).toBe(crypto.createHash('sha256').update(doSite).digest('hex'));
+  expect(rede.externos()).toEqual([]);
+  // O mesmo arquivo aberto do disco não oferece o download (já é a versão sem internet)
+  await abrirApp(page, MODOS[1].url);
+  await expect(page.getByRole('link', { name: 'Baixar para usar sem internet' })).toHaveCount(0);
 });

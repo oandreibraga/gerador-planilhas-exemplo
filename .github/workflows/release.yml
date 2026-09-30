@@ -50,6 +50,7 @@ jobs:
           subject-path: |
             dist/gerador-planilhas-exemplo.html
             dist/index.html
+            dist/gerador-planilhas-exemplo.zip
       - name: Notas da versão (seção do CHANGELOG.md)
         run: |
           awk -v v="$VERSAO" '
@@ -71,12 +72,12 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh release create "$GITHUB_REF_NAME" \
-            dist/gerador-planilhas-exemplo.html dist/testes.html dist/SHA256SUMS dist/sbom.cdx.json \
+            dist/gerador-planilhas-exemplo.html dist/gerador-planilhas-exemplo.zip dist/testes.html dist/SHA256SUMS dist/sbom.cdx.json \
             --repo "$GITHUB_REPOSITORY" --title "Gerador de planilhas de exemplo $VERSAO" --notes-file "$RUNNER_TEMP/notas.md" --verify-tag
       - name: Preparar o site
         run: |
           mkdir -p site
-          cp dist/index.html dist/gerador-planilhas-exemplo.html dist/SHA256SUMS site/
+          cp dist/index.html dist/gerador-planilhas-exemplo.html dist/gerador-planilhas-exemplo.zip dist/SHA256SUMS site/
       - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
         with:
           path: site

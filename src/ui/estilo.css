@@ -60,6 +60,13 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .faixa p { margin: 0; max-width: 760px; color: var(--faixa-texto); font-size: 16px; }
 .faixa-privacidade { display: flex; gap: 8px; align-items: flex-start; margin-top: 14px !important; color: #fff !important; font-size: 14px !important; }
 .faixa-privacidade .ico { color: var(--destaque); margin-top: 2px; }
+.faixa-offline { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; margin-top: 18px !important; }
+.faixa-baixar {
+  display: inline-flex; align-items: center; gap: 8px; padding: 8px 16px; border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, .7); color: #fff; font-weight: 650; font-size: 15px; text-decoration: none;
+}
+.faixa-baixar:hover { background: rgba(255, 255, 255, .12); }
+.faixa-offline-texto { color: var(--faixa-texto); font-size: 14px; }
 
 .principal { padding-top: 24px; padding-bottom: 8px; }
 .conteudo { border: 0; padding: 0; margin: 0; min-width: 0; }

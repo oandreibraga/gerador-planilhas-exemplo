@@ -37,6 +37,7 @@ function conferirDist() {
     const real = crypto.createHash('sha256').update(ler(nome)).digest('hex');
     if (real !== hash) throw new Error('SHA256SUMS não confere para ' + nome);
   }
+  if (!ler('gerador-planilhas-exemplo.zip').includes(Buffer.from('LEIA-ME.txt'))) throw new Error('pacote .zip sem LEIA-ME');
   const tamanho = ler('gerador-planilhas-exemplo.html').length;
   console.log('dist/gerador-planilhas-exemplo.html: ' + (tamanho / 1048576).toFixed(2) + ' MB, hashes conferidos');
   return true;

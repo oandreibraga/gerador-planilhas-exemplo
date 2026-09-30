@@ -1,0 +1,31 @@
+GERADOR DE PLANILHAS DE EXEMPLO - versão @@VERSAO@@
+Versão para usar sem internet
+
+COMO USAR
+1. Descompacte este arquivo .zip numa pasta do seu computador
+   (clique com o botão direito > Extrair tudo).
+2. Dê dois cliques em gerador-planilhas-exemplo.html.
+   Ele abre no navegador (Edge, Chrome ou Firefox).
+3. Escolha a planilha e siga os passos na tela.
+
+Não precisa instalar nada nem ter internet. A planilha é lida só no seu
+computador: a página não faz nenhuma conexão com a internet.
+
+O QUE O ARQUIVO GERADO CONTÉM
+Os valores são inventados. Nomes das abas, títulos das colunas, listas curtas
+(como status) e colunas com um valor fixo continuam como no original.
+Confira o arquivo antes de compartilhar.
+
+CONFERIR SE O ARQUIVO É O ORIGINAL
+No Windows, abra o PowerShell na pasta e digite:
+    Get-FileHash gerador-planilhas-exemplo.html
+O código que aparecer deve ser igual ao que está em SHA256SUMS.txt e na
+página de versões:
+    @@REPOSITORIO@@/releases
+
+VERSÃO MAIS NOVA E DÚVIDAS
+Site:      @@SITE@@
+Código:    @@REPOSITORIO@@
+Privacidade e limites: @@REPOSITORIO@@/blob/main/PRIVACIDADE.md
+
+Licença Apache-2.0 (veja LICENSE.txt e NOTICE.txt).

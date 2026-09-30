@@ -102,3 +102,19 @@ test('versão do SheetJS registrada em vendor/sheetjs/VERSAO confere com o arqui
   const registrada = fs.readFileSync(new URL('../../vendor/sheetjs/VERSAO', import.meta.url), 'utf8').trim();
   assert.equal(XLSX.version, registrada);
 });
+
+test('pacote .zip para usar sem internet: mesmo HTML do site, LEIA-ME e bytes reprodutíveis', async () => {
+  const { montarPacote } = await import('../../scripts/build.mjs');
+  const JSZip = (await import('jszip')).default;
+  const a = await montarPacote(html), b = await montarPacote(html);
+  assert.ok(a.equals(b), 'duas montagens do pacote deram bytes diferentes');
+  const zip = await JSZip.loadAsync(a);
+  assert.deepEqual(Object.keys(zip.files).sort(), ['LEIA-ME.txt', 'LICENSE.txt', 'NOTICE.txt', 'SHA256SUMS.txt', 'gerador-planilhas-exemplo.html']);
+  assert.equal(await zip.file('gerador-planilhas-exemplo.html').async('string'), html);
+  const leiaMe = await zip.file('LEIA-ME.txt').async('string');
+  assert.doesNotMatch(leiaMe, /@@/);
+  assert.match(leiaMe, /\r\n/, 'LEIA-ME com quebra de linha do Windows');
+  assert.match(leiaMe, /https:\/\/github\.com\/oandreibraga\/gerador-planilhas-exemplo\/releases/);
+  const soma = await zip.file('SHA256SUMS.txt').async('string');
+  assert.equal(soma.split(/\s+/)[0], crypto.createHash('sha256').update(html, 'utf8').digest('hex'));
+});

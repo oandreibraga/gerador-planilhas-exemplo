@@ -110,6 +110,12 @@ jobs:
           echo "Release $tag: $esperado"
           echo "Site $url: $no_ar"
           if [ "$esperado" != "$no_ar" ]; then echo "::error::O site no ar é diferente do arquivo da Release $tag"; exit 1; fi
+          if grep -q ' gerador-planilhas-exemplo.zip$' "$RUNNER_TEMP/rel/SHA256SUMS"; then
+            zip_esperado=$(grep ' gerador-planilhas-exemplo.zip$' "$RUNNER_TEMP/rel/SHA256SUMS" | cut -d' ' -f1)
+            zip_no_ar=$(curl -fsSL "${url}gerador-planilhas-exemplo.zip" | sha256sum | cut -d' ' -f1)
+            echo "Pacote .zip no site: $zip_no_ar"
+            if [ "$zip_esperado" != "$zip_no_ar" ]; then echo "::error::O .zip do site é diferente do da Release $tag"; exit 1; fi
+          fi
 
   scorecard:
     name: OpenSSF Scorecard

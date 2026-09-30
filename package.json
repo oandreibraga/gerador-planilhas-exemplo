@@ -1,8 +1,13 @@
 {
   "name": "gerador-planilhas-exemplo",
-  "version": "3.0.0",
+  "version": "3.1.0",
   "description": "Gera cópias de planilhas com dados fictícios, 100% no navegador, sem enviar nada para a internet.",
   "license": "Apache-2.0",
+  "homepage": "https://oandreibraga.github.io/gerador-planilhas-exemplo/",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/oandreibraga/gerador-planilhas-exemplo"
+  },
   "private": true,
   "type": "module",
   "engines": {

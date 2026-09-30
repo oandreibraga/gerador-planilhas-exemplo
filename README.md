@@ -10,7 +10,7 @@ Cria uma cópia da sua planilha com **dados inventados**, mantendo a mesma estru
 
 ## Como usar
 
-1. Abra o site (https://oandreibraga.github.io/gerador-planilhas-exemplo/) ou o arquivo `gerador-planilhas-exemplo.html` (baixado da página de [Releases](../../releases)).
+1. Abra o site (https://oandreibraga.github.io/gerador-planilhas-exemplo/) ou, para usar sem internet, clique em **Baixar para usar sem internet** no próprio site: vem um `.zip`; descompacte e abra o `gerador-planilhas-exemplo.html` no navegador, sem instalar nada. O mesmo pacote está na página de [Releases](../../releases).
 2. Escolha a planilha (`.xlsx`, `.xlsm`, `.xls`, `.xlsb`, `.ods`, `.csv` ou um `.zip` com planilhas). Se só tiver os títulos das colunas, cole-os na aba "Só tenho os títulos das colunas".
 3. Confira o tipo que a ferramenta identificou em cada coluna e corrija se precisar.
 4. Escolha 10, 20 ou 30 linhas e clique em **Baixar planilha de exemplo**. O arquivo sai como `<nome original>_amostra.xlsx`.

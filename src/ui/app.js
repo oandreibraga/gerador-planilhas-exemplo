@@ -48,6 +48,12 @@ function h(tag, props, filhos) {
 }
 
 // Único uso de innerHTML: desenhos SVG fixos de ICONES (nunca texto vindo do arquivo ou da pessoa).
+// Aberta pelo site (http/https)? No arquivo baixado (file://) a pessoa já está usando a versão sem internet.
+function pelaInternet() {
+  var p = (typeof location !== 'undefined' && location.protocol) || '';
+  return p === 'http:' || p === 'https:';
+}
+
 var ultimoId = 0;
 function novoId(prefixo) { return prefixo + '-' + (++ultimoId); }
 
@@ -354,7 +360,11 @@ function montar(raiz, opcoes) {
       h('p', { text: 'A ferramenta copia só a estrutura (abas, colunas e formatos) e preenche com dados inventados. ' +
         'Use o arquivo gerado para pedir automações ou tirar dúvidas sem expor os dados reais.' }),
       h('p', { class: 'faixa-privacidade' }, [icone('cadeado'),
-        h('span', { text: 'Sua planilha é lida só neste computador e nada é enviado para a internet. Os valores do arquivo gerado são inventados; nomes de abas, títulos das colunas e listas curtas (como status) continuam como no original.' })])
+        h('span', { text: 'Sua planilha é lida só neste computador e nada é enviado para a internet. Os valores do arquivo gerado são inventados; nomes de abas, títulos das colunas e listas curtas (como status) continuam como no original.' })]),
+      pelaInternet() ? h('p', { class: 'faixa-offline' }, [
+        h('a', { class: 'faixa-baixar', href: 'gerador-planilhas-exemplo.zip', download: '' }, [icone('baixar'), h('span', { text: 'Baixar para usar sem internet' })]),
+        h('span', { class: 'faixa-offline-texto', text: 'Um arquivo .zip com a ferramenta: descompacte e abra no navegador, sem instalar nada.' })
+      ]) : null
     ])
   ]);
 

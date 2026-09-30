@@ -1,8 +1,9 @@
 // Monta os arquivos publicados em dist/:
 //   gerador-planilhas-exemplo.html  app completo em um arquivo (offline)
 //   index.html                      o mesmo arquivo, para o site (mesmo hash)
-//   testes.html        suíte de testes para abrir no navegador
-//   SHA256SUMS         hashes para quem baixa conferir
+//   gerador-planilhas-exemplo.zip   pacote para usar sem internet (HTML + LEIA-ME + hashes + licenças)
+//   testes.html                     suíte de testes para abrir no navegador
+//   SHA256SUMS                      hashes para quem baixa conferir
 // Uso: node scripts/build.mjs [--tema caminho/para/tema.css]
 // Não acessa a rede. O resultado é determinístico (mesma entrada → mesmos bytes).
 import fs from 'node:fs';
@@ -10,6 +11,7 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import * as esbuild from 'esbuild';
+import JSZip from 'jszip';
 
 const raiz = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const ler = (p) => fs.readFileSync(path.join(raiz, p), 'utf8').replace(/\r\n/g, '\n');
@@ -117,13 +119,33 @@ export async function montarTestes() {
   return html;
 }
 
+// Pacote para usar sem internet: o mesmo HTML do site + LEIA-ME + hashes + licenças.
+// Datas fixas e textos com quebra de linha do Windows: os mesmos bytes em qualquer máquina.
+export async function montarPacote(html) {
+  const pacote = JSON.parse(ler('package.json'));
+  const repositorio = pacote.repository.url.replace(/\.git$/, '');
+  const crlf = (s) => s.replace(/\r?\n/g, '\r\n');
+  const leiaMe = ler('src/pacote/LEIA-ME.txt').split('@@VERSAO@@').join(versao())
+    .split('@@SITE@@').join(pacote.homepage).split('@@REPOSITORIO@@').join(repositorio);
+  const data = new Date(Date.UTC(2026, 0, 1, 0, 0, 0)); // o JSZip grava a data em UTC: fixa em qualquer fuso
+  const zip = new JSZip();
+  const opcoes = { date: data, createFolders: false };
+  zip.file('gerador-planilhas-exemplo.html', html, opcoes);
+  zip.file('LEIA-ME.txt', crlf(leiaMe), opcoes);
+  zip.file('SHA256SUMS.txt', crlf(sha256(html) + '  gerador-planilhas-exemplo.html\n'), opcoes);
+  zip.file('LICENSE.txt', crlf(ler('LICENSE')), opcoes);
+  zip.file('NOTICE.txt', crlf(ler('NOTICE')), opcoes);
+  return zip.generateAsync({ type: 'nodebuffer', compression: 'DEFLATE', compressionOptions: { level: 9 }, platform: 'DOS' });
+}
+
 async function principal() {
   const dist = path.join(raiz, 'dist');
   fs.mkdirSync(dist, { recursive: true });
   const tema = argumento('--tema');
   const { html } = await montarApp({ tema: tema ? path.resolve(tema) : null });
   const testes = await montarTestes();
-  const arquivos = { 'gerador-planilhas-exemplo.html': html, 'index.html': html, 'testes.html': testes };
+  const zip = await montarPacote(html);
+  const arquivos = { 'gerador-planilhas-exemplo.html': html, 'index.html': html, 'gerador-planilhas-exemplo.zip': zip, 'testes.html': testes };
   const somas = [];
   for (const [nome, conteudo] of Object.entries(arquivos)) {
     fs.writeFileSync(path.join(dist, nome), conteudo);
