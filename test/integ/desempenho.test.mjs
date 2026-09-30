@@ -1,5 +1,6 @@
 // Orçamento de tempo: planilha de vendas com 20 mil linhas (as 150 linhas de exemplo repetidas).
-// Limites folgados para máquinas de CI; ajuste com DESEMPENHO_FATOR (ex.: 2 = dobra os limites).
+// Limites folgados: os testes rodam em paralelo e a máquina pode estar ocupada (sozinho leva ~0,7 s e ~0,1 s).
+// O objetivo é pegar piora grande (ex.: algo quadrático), não medir milissegundos. DESEMPENHO_FATOR multiplica os limites.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { A, XLSX } from '../apoio/ambiente.mjs';
@@ -33,6 +34,6 @@ test('20 mil linhas: leitura + análise e geração dentro do orçamento', { tim
   console.log('  ' + (bytes.length / 1048576).toFixed(1) + ' MB · leitura+análise ' + Math.round(leitura) + ' ms · geração ' + Math.round(geracao) + ' ms');
   assert.ok(r.bytes.byteLength > 0);
   assert.ok(arq.abas[0].totalLinhas >= LINHAS, 'total de linhas informado: ' + arq.abas[0].totalLinhas);
-  assert.ok(leitura < 3000 * FATOR, 'leitura+análise levou ' + Math.round(leitura) + ' ms (limite ' + 3000 * FATOR + ')');
-  assert.ok(geracao < 1000 * FATOR, 'geração levou ' + Math.round(geracao) + ' ms (limite ' + 1000 * FATOR + ')');
+  assert.ok(leitura < 6000 * FATOR, 'leitura+análise levou ' + Math.round(leitura) + ' ms (limite ' + 6000 * FATOR + ')');
+  assert.ok(geracao < 2000 * FATOR, 'geração levou ' + Math.round(geracao) + ' ms (limite ' + 2000 * FATOR + ')');
 });
