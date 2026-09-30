@@ -1,0 +1,24 @@
+# dependências e ferramentas locais
+node_modules/
+.ferramentas/
+.npm-cache/
+
+# saídas geradas
+dist/
+test/saida/
+test-results/
+playwright-report/
+testes/saida/
+
+# temas internos (ex.: tema da empresa) não vão para o repositório público
+temas-internos/
+
+# versão antiga, mantida só localmente como referência até o fim da Fase 0
+gerador-amostra.html
+
+# sistema
+Thumbs.db
+.DS_Store
+
+# configurações locais do Claude Code
+.claude/settings.local.json

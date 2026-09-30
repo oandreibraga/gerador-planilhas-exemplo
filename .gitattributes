@@ -1,0 +1,7 @@
+# Finais de linha LF no repositório (build reprodutível em Windows e Linux)
+* text=auto eol=lf
+# Arquivos que precisam ficar byte a byte iguais (o hash é conferido no build)
+vendor/sheetjs/xlsx.full.min.js -text
+*.xlsx binary
+*.xls binary
+*.zip binary

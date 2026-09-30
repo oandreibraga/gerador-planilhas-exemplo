@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="@@CSP@@">
+<meta name="referrer" content="no-referrer">
+<meta http-equiv="x-dns-prefetch-control" content="off">
+<link rel="icon" href="data:,">
+<title>Gerador de planilhas de exemplo</title>
+<style>
+/*@@ESTILO@@*/
+</style>
+</head>
+<body>
+<div id="app"></div>
+<footer class="rodape">
+  <div class="rodape-interno">
+    <p class="rodape-versao">Versão @@VERSAO@@ · roda inteiramente no seu navegador · nenhum dado é enviado para a internet</p>
+    <details>
+      <summary>Privacidade e limites</summary>
+      <p>A planilha é lida só neste computador. A página não faz nenhuma conexão com a internet: uma regra de segurança do próprio arquivo (Content-Security-Policy) bloqueia qualquer envio.</p>
+      <p>O arquivo gerado tem dados inventados. Listas curtas (como tipo de documento ou status), valores 0/1 e colunas com um valor fixo mantêm o que está no original; colunas marcadas como "usar reais" também. Nomes de abas e títulos das colunas são mantidos.</p>
+      <p>A ferramenta ajuda a proteger dados, mas não substitui a sua revisão: confira o arquivo antes de compartilhar.</p>
+    </details>
+    <details>
+      <summary>Licenças</summary>
+      <pre class="licenca">@@AVISOS@@</pre>
+      <pre class="licenca">@@LICENCA_APP@@</pre>
+    </details>
+  </div>
+</footer>
+<noscript>Esta ferramenta precisa de JavaScript ativado no navegador.</noscript>
+<script id="sheetjs">
+/*@@XLSX@@*/
+</script>
+<script id="biblioteca">
+/*@@BIBLIOTECA@@*/
+</script>
+<script type="text/plain" id="trabalhador">
+/*@@TRABALHADOR@@*/
+</script>
+<script>/*@@INICIAR@@*/</script>
+</body>
+</html>

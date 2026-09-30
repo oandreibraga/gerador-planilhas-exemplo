@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="connect-src 'none'; form-action 'none'; base-uri 'none'">
+<title>Testes do gerador</title>
+<style>
+:root {
+  --fundo: #f5f6f8; --superficie: #fff; --borda: #dadfe6; --texto: #1a1e23; --texto-2: #58616d;
+  --ok: #1d7a4c; --ok-suave: #e3f3ea; --erro: #b42318; --erro-suave: #fdecea; --aviso: #8a5600; --aviso-suave: #fff3d6;
+  --primaria: #17664f; --primaria-texto: #fff; color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --fundo: #101316; --superficie: #171b20; --borda: #2c333c; --texto: #e6e9ed; --texto-2: #9aa3af;
+    --ok: #57c78e; --ok-suave: #14301f; --erro: #f47067; --erro-suave: #3a1715; --aviso: #f0b44c; --aviso-suave: #33270f;
+    --primaria: #3cb38c; --primaria-texto: #08130f; color-scheme: dark;
+  }
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--fundo); color: var(--texto); font: 15px/1.5 "Segoe UI", system-ui, sans-serif; }
+.pagina { max-width: 1000px; margin: 0 auto; padding: 24px 16px 48px; }
+h1 { font-size: 22px; margin: 0 0 4px; }
+h2 { font-size: 17px; margin: 0 0 8px; }
+p { margin: 0 0 8px; color: var(--texto-2); }
+.painel { background: var(--superficie); border: 1px solid var(--borda); border-radius: 10px; padding: 14px 16px; margin: 14px 0; }
+.topo-painel { display: flex; flex-wrap: wrap; gap: 10px 16px; align-items: center; justify-content: space-between; }
+.placar { font-size: 16px; font-weight: 650; display: flex; align-items: center; gap: 8px; }
+.placar .ok { color: var(--ok); } .placar .falhou { color: var(--erro); } .placar .aviso { color: var(--aviso); }
+.botoes { display: flex; flex-wrap: wrap; gap: 8px; }
+button { font: inherit; font-size: 14px; font-weight: 650; padding: 7px 14px; border-radius: 8px; border: 1px solid var(--borda); background: var(--superficie); color: var(--texto); cursor: pointer; }
+button.pri { background: var(--primaria); border-color: var(--primaria); color: var(--primaria-texto); }
+button:disabled { opacity: .55; cursor: not-allowed; }
+button.feito { background: var(--ok); border-color: var(--ok); color: #fff; }
+.giro { width: 16px; height: 16px; border-radius: 50%; border: 2px solid currentColor; border-right-color: transparent; animation: g .7s linear infinite; display: inline-block; }
+@keyframes g { to { transform: rotate(360deg); } }
+.grupo { background: var(--superficie); border: 1px solid var(--borda); border-radius: 10px; margin: 12px 0; overflow: hidden; }
+.grupo h3 { margin: 0; padding: 10px 14px; font-size: 15px; display: flex; gap: 10px; align-items: center; border-bottom: 1px solid var(--borda); }
+.grupo h3 .contagem { font-size: 12px; font-weight: 700; padding: 1px 8px; border-radius: 999px; background: var(--ok-suave); color: var(--ok); }
+.grupo h3 .contagem.ruim { background: var(--erro-suave); color: var(--erro); }
+.grupo ul { list-style: none; margin: 0; padding: 4px 0; }
+.grupo li { display: grid; grid-template-columns: 22px 1fr; gap: 2px 6px; padding: 5px 14px; font-size: 14px; }
+.grupo li .ic { font-weight: 800; }
+.grupo li.ok .ic { color: var(--ok); } .grupo li.falhou .ic { color: var(--erro); } .grupo li.aviso .ic { color: var(--aviso); } .grupo li.info .ic { color: var(--texto-2); }
+.grupo li.falhou { background: var(--erro-suave); } .grupo li.aviso { background: var(--aviso-suave); }
+.grupo li .det { grid-column: 2; color: var(--texto-2); font-size: 12.5px; font-family: Consolas, monospace; overflow-wrap: anywhere; white-space: pre-wrap; }
+#palco { position: absolute; left: -12000px; top: 0; width: 1100px; }
+</style>
+</head>
+<body>
+<main class="pagina">
+  <h1>Testes do gerador de amostras</h1>
+  <p>Monta planilhas de exemplo com dados inventados aqui mesmo, na memória, e roda o mesmo código de <code>fonte/</code> usado pelo <code>gerador-amostra.html</code>. Nenhuma planilha real é lida.</p>
+  <section class="painel topo-painel">
+    <div id="placar" class="placar">Preparando…</div>
+    <div class="botoes">
+      <button id="btnRodar" type="button">Executar de novo</button>
+      <button id="btnCopiar" type="button" class="pri" disabled>Copiar relatório</button>
+    </div>
+  </section>
+  <section class="painel">
+    <h2>Planilhas de exemplo</h2>
+    <p>Baixe para testar o <code>gerador-amostra.html</code> na mão. Todos os dados são inventados.</p>
+    <div id="downloads" class="botoes"><span class="giro"></span></div>
+  </section>
+  <section id="lista"></section>
+</main>
+<div id="palco" aria-hidden="true"></div>
+
+<script>
+// Registra erros de carga e qualquer tentativa de acesso à rede (o teste exige zero).
+window.__errosCarga = [];
+window.__rede = [];
+window.addEventListener('error', function (e) {
+  window.__errosCarga.push(String(e.filename || '').split('/').pop() + ':' + e.lineno + ' ' + e.message);
+});
+(function () {
+  function bloquear(tipo) {
+    return function (u) {
+      window.__rede.push(tipo + ' ' + String(u));
+      throw new Error('Acesso à rede bloqueado no teste: ' + tipo);
+    };
+  }
+  window.fetch = bloquear('fetch');
+  window.WebSocket = bloquear('WebSocket');
+  window.EventSource = bloquear('EventSource');
+  var abrirXhr = XMLHttpRequest.prototype.open;
+  XMLHttpRequest.prototype.open = function (m, u) {
+    window.__rede.push('XMLHttpRequest ' + u);
+    return abrirXhr.apply(this, arguments);
+  };
+  if (navigator.sendBeacon) navigator.sendBeacon = function (u) { window.__rede.push('sendBeacon ' + u); return false; };
+})();
+</script>
+<script>
+/*@@XLSX@@*/
+</script>
+<script>
+/*@@BIBLIOTECA@@*/
+</script>
+<script>
+/*@@SUITE@@*/
+</script>
+</body>
+</html>

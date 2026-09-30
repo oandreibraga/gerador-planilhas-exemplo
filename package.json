@@ -1,0 +1,30 @@
+{
+  "name": "anonimizador",
+  "version": "3.0.0-dev",
+  "description": "Gera cópias de planilhas com dados fictícios, 100% no navegador, sem enviar nada para a internet.",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "lint": "eslint .",
+    "fixtures": "node scripts/gerar-fixtures.mjs",
+    "test": "node --test \"test/unit/*.test.mjs\" \"test/integ/*.test.mjs\"",
+    "test:navegador": "node test/navegador/rodar-no-jsdom.mjs",
+    "e2e": "playwright test",
+    "verificar": "node scripts/verificar.mjs"
+  },
+  "devDependencies": {
+    "@axe-core/playwright": "4.13.0",
+    "@eslint/js": "10.0.1",
+    "@playwright/test": "1.63.0",
+    "esbuild": "0.28.2",
+    "eslint": "10.11.0",
+    "exceljs": "4.4.0",
+    "globals": "17.12.0",
+    "jsdom": "30.1.1",
+    "jszip": "3.10.2"
+  }
+}

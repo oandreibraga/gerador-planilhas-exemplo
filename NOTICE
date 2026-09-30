@@ -1,0 +1,13 @@
+Gerador de planilhas de exemplo (anonimizador)
+Copyright 2026 [titular a definir pelo jurídico]
+
+Este produto inclui software e dados de terceiros:
+
+- SheetJS Community Edition 0.20.3 (xlsx.full.min.js)
+  Copyright (C) 2013-present SheetJS LLC
+  Licenciado sob a Apache License, Version 2.0 (texto em vendor/sheetjs/LICENSE
+  e reproduzido abaixo, pois é a mesma licença deste projeto).
+  Fonte: https://cdn.sheetjs.com/xlsx-0.20.3/
+
+- Lista de municípios e unidades da federação do Brasil
+  Fonte: IBGE, API de Localidades (servicodados.ibge.gov.br). Dados públicos.
