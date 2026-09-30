@@ -12,6 +12,7 @@ import './formatos/leitura.js';
 import './nucleo/geradores.js';
 import './nucleo/pseudonimo.js';
 import './formatos/amostra.js';
+import './formatos/inteiro.js';
 import './nucleo/resumo.js';
 import './ui/app.js';
 

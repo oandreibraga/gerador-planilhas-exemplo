@@ -407,4 +407,5 @@ leitura.abrirSeguro = async function (entrada) {
 
 leitura.nomeAbaValido = nomeAbaValido;
 leitura.detectarSeparador = detectarSeparador;
+leitura.decodificarCsv = decodificar;
 A.leitura = leitura;

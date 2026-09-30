@@ -22,8 +22,11 @@ function diretivas(texto) {
 
 // Scripts que o navegador executa (o do Worker é text/plain e só roda dentro do Blob).
 const executaveis = [...doc.querySelectorAll('script')].filter((s) => !s.type || s.type === 'text/javascript');
-const codigoApp = () => ['biblioteca', 'trabalhador'].map((id) => doc.getElementById(id).textContent).join('\n') +
-  executaveis.filter((s) => !s.id).map((s) => s.textContent).join('\n');
+// Os identificadores de namespace do Office Open XML (http://schemas.openxmlformats.org/...) são nomes
+// obrigatórios dentro dos arquivos .xlsx, nunca acessados; qualquer outro endereço continua proibido.
+const NAMESPACES = /https?:\/\/(schemas\.openxmlformats\.org|schemas\.microsoft\.com|purl\.org|www\.w3\.org)\/[^\s"'<>\\]*/g;
+const codigoApp = () => (['biblioteca', 'trabalhador'].map((id) => doc.getElementById(id).textContent).join('\n') +
+  executaveis.filter((s) => !s.id).map((s) => s.textContent).join('\n')).replace(NAMESPACES, '');
 
 test('CSP da página: exatamente as diretivas esperadas, sem unsafe-*', () => {
   const meta = doc.querySelector('meta[http-equiv="Content-Security-Policy"]');

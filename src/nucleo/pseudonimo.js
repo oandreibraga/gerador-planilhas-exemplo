@@ -215,15 +215,19 @@ function criar(opcoes) {
   function trocarChave(classe, k) { return baseDe(classe, k, k, null); }
 
   // ---------- desenho no formato da ocorrência ----------
+  // Estilo de maiúsculas da ocorrência: tudo maiúsculo, tudo minúsculo, Cada Palavra (nomes) ou Frase.
   function caixaDe(s) {
     var e = U.estiloCaixa([s]);
     if (e !== 'misto') return e;
-    return /\p{Lu}/u.test(s.charAt(0)) ? 'titulo' : 'misto';
+    var palavras = s.split(/\s+/).filter(function (w) { return /\p{L}/u.test(w) && !/^(da|de|do|das|dos|e)$/i.test(w); });
+    if (palavras.length && palavras.every(function (w) { return /^\P{L}*\p{Lu}/u.test(w); })) return 'titulo';
+    return /^\P{L}*\p{Lu}/u.test(s) ? 'frase' : 'misto';
   }
   function aplicarCaixa(s, estilo) {
     if (estilo === 'maiusculo') return s.toUpperCase();
     if (estilo === 'minusculo') return s.toLowerCase();
     if (estilo === 'titulo') return tituloDe(s);
+    if (estilo === 'frase') { var m = s.toLowerCase(); return m.charAt(0).toUpperCase() + m.slice(1); }
     return s;
   }
   function comoOriginal(real, fict) {
@@ -253,8 +257,10 @@ function criar(opcoes) {
     if (classe === 'email') return celulaTexto(cel, real === real.toUpperCase() ? base.toUpperCase() : base);
     if (classe === 'codigo') return celulaTexto(cel, base);
     if (classe === 'empresa') {
+      // O sufixo (Ltda, S.A., ME…) fica escrito como no original; o nome segue a caixa do resto do nome
       var suf = /(^|\s)(ltda\.?|s\.?\/?a\.?|me|eireli|epp)$/i.exec(real.trim());
-      return celulaTexto(cel, comoOriginal(real, base + (suf ? ' ' + suf[2] : '')));
+      var semSufixo = suf ? real.trim().slice(0, suf.index).trim() || real : real;
+      return celulaTexto(cel, comoOriginal(semSufixo, base) + (suf ? ' ' + suf[2] : ''));
     }
     if (classe === 'endereco') {
       var primeira = /^\s*([A-Za-zÀ-ÿ]+\.?)\s/.exec(real);

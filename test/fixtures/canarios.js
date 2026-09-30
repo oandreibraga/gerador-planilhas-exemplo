@@ -53,24 +53,65 @@ export async function varrerXlsx(bytes, canarios, JSZip) {
     if (zip.files[nome].dir) continue;
     partes.push({ nome, texto: decodificarXml(await zip.files[nome].async('string')) });
   }
+  // Índice: cada canário fica sob a sua primeira "palavra" (sequência de letras/dígitos); no texto, só se
+  // testam os canários cuja primeira palavra começa naquela posição. Mesmo resultado da busca simples,
+  // em uma fração do tempo quando há dezenas de milhares de canários (arquivo inteiro).
+  const RE_PALAVRA = /[\p{L}\p{N}]+/gu;
+  const porPalavra = new Map();
+  for (const c of canarios.textos) {
+    RE_PALAVRA.lastIndex = 0;
+    const m = RE_PALAVRA.exec(c);
+    if (!m) continue;
+    const lista = porPalavra.get(m[0]) || [];
+    lista.push({ c, desloc: m.index });
+    porPalavra.set(m[0], lista);
+  }
+  const digitos = new Set(canarios.digitos);
   const vazamentos = [];
   for (const parte of partes) {
-    const texto = normalizarCanario(parte.texto);
-    for (const c of canarios.textos) {
-      let i = texto.indexOf(c);
-      while (i >= 0) {
-        const antes = texto.charAt(i - 1), depois = texto.charAt(i + c.length);
-        if (!/[\p{L}\p{N}]/u.test(antes) && !/[\p{L}\p{N}]/u.test(depois)) { vazamentos.push(parte.nome + ': "' + c + '"'); break; }
-        i = texto.indexOf(c, i + 1);
+    const texto = normalizarCanario(parte.texto), achados = new Set();
+    RE_PALAVRA.lastIndex = 0;
+    let m;
+    while ((m = RE_PALAVRA.exec(texto))) {
+      const lista = porPalavra.get(m[0]);
+      if (!lista) continue;
+      for (const { c, desloc } of lista) {
+        const i = m.index - desloc;
+        if (i < 0 || achados.has(c) || !texto.startsWith(c, i)) continue;
+        if (/[\p{L}\p{N}]/u.test(texto.charAt(i - 1)) || /[\p{L}\p{N}]/u.test(texto.charAt(i + c.length))) continue;
+        achados.add(c);
+        vazamentos.push(parte.nome + ': "' + c + '"');
       }
     }
-    for (const d of canarios.digitos) {
-      let i = parte.texto.indexOf(d);
-      while (i >= 0) {
-        if (!/\d/.test(parte.texto.charAt(i - 1)) && !/\d/.test(parte.texto.charAt(i + d.length))) { vazamentos.push(parte.nome + ': ' + d); break; }
-        i = parte.texto.indexOf(d, i + 1);
-      }
-    }
+    const numeros = new Set(parte.texto.match(/\d+/g) || []);
+    for (const d of numeros) if (digitos.has(d)) vazamentos.push(parte.nome + ': ' + d);
   }
   return vazamentos;
+}
+
+// Canários do modo "arquivo inteiro": todos os valores (não só as primeiras linhas) das colunas que são
+// trocadas por padrão, e os textos acima do cabeçalho. Colunas mantidas (datas, valores, listas, cidade/UF)
+// ficam de fora, porque continuam iguais de propósito.
+const PSEUDONIMIZADAS = new Set(['pessoa', 'empresa', 'cpf', 'cnpj', 'email', 'telefone', 'cep', 'endereco', 'bairro', 'chave', 'codigo', 'texto']);
+export function canariosPseudonimo(def) {
+  const cabecalhos = new Set();
+  def.abas.forEach((a) => {
+    cabecalhos.add(normalizarCanario(a.nome));
+    (a.colunas || []).forEach((dc) => cabecalhos.add(normalizarCanario(dc.nome)));
+  });
+  const textos = new Set(), digitos = new Set();
+  const adicionar = (v) => { const n = normalizarCanario(v); if (n.length >= 5 && !cabecalhos.has(n)) textos.add(n); };
+  def.abas.forEach((a) => {
+    (a.acima || []).forEach((l) => l.forEach((v) => { if (typeof v === 'string') adicionar(v); }));
+    (a.colunas || []).forEach((dc) => {
+      if (!PSEUDONIMIZADAS.has(dc.esp.tipo)) return;
+      dc.valores.forEach((v) => {
+        if (v == null) return;
+        if (typeof v === 'string') adicionar(v);
+        const d = String(v).replace(/\D/g, '');
+        if (DIGITOS.has(dc.esp.tipo) && d.length >= 10) digitos.add(d);
+      });
+    });
+  });
+  return { textos: [...textos], digitos: [...digitos] };
 }
