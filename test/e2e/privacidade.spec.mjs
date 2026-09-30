@@ -40,14 +40,15 @@ for (const modo of MODOS) {
           img.onerror = () => { r.imagem = 'bloqueado'; fim(); };
           img.src = 'https://example.com/vazou.png';
         });
-        try {
-          await new Promise((ok, falha) => {
+        // Só conta como "saiu" se a conexão abrir; erro, exceção ou silêncio por 3 s contam como bloqueio.
+        r.websocket = await new Promise((fim) => {
+          setTimeout(() => fim('bloqueado'), 3000);
+          try {
             const ws = new WebSocket('wss://example.com/vazou');
-            ws.onopen = () => ok();
-            ws.onerror = () => falha(new Error('erro'));
-          });
-          r.websocket = 'saiu';
-        } catch (e) { r.websocket = 'bloqueado'; }
+            ws.onopen = () => fim('saiu');
+            ws.onerror = () => fim('bloqueado');
+          } catch (e) { fim('bloqueado'); }
+        });
         await new Promise((fim) => setTimeout(fim, 300));
         return r;
       });
