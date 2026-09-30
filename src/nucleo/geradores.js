@@ -6,8 +6,48 @@ var TENTATIVAS = 30;
 
 function det() { return A.detectar; }
 
+// Índice dos textos reais do arquivo, normalizados (sem caixa, acento e pontuação), para recusar um valor gerado
+// que seja igual a um real ("SONIA SILVA" x "Sônia Silva") ou que contenha um real inteiro ("JARDIM BOA VISTA" x "BOA VISTA").
+var cacheIndice = new WeakMap();
+function normTexto(s) {
+  return U.semAcento(String(s)).toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
+}
+function indiceReais(ctx) {
+  var chave = ctx.textosReais || (ctx.textosReais = new Set());
+  var ind = cacheIndice.get(chave);
+  if (ind) return ind;
+  ind = { exatos: new Set(), porPalavra: new Map() };
+  chave.forEach(function (t) {
+    var n = normTexto(t);
+    if (!n) return;
+    ind.exatos.add(n);
+    if (n.length < 5) return;
+    var palavras = n.split(' ');
+    var lista = ind.porPalavra.get(palavras[0]);
+    if (!lista) { lista = []; ind.porPalavra.set(palavras[0], lista); }
+    lista.push(palavras);
+  });
+  cacheIndice.set(chave, ind);
+  return ind;
+}
 function vazouTexto(ctx, s) {
-  return !!(ctx.textosReais && ctx.textosReais.has(String(s).trim()));
+  var n = normTexto(s);
+  if (!n) return false;
+  var ind = indiceReais(ctx);
+  if (ind.exatos.has(n)) return true;
+  var p = n.split(' ');
+  for (var i = 0; i < p.length; i++) {
+    var candidatos = ind.porPalavra.get(p[i]);
+    if (!candidatos) continue;
+    for (var k = 0; k < candidatos.length; k++) {
+      var c = candidatos[k];
+      if (c.length > p.length - i) continue;
+      var igual = true;
+      for (var j = 1; j < c.length; j++) if (p[i + j] !== c[j]) { igual = false; break; }
+      if (igual) return true;
+    }
+  }
+  return false;
 }
 
 function escolherPonderado(lista, rng) {
