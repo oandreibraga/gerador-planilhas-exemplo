@@ -1,0 +1,23 @@
+# Propostas semanais de atualização. Cada uma vira um PR que passa pelo CI inteiro.
+# O SheetJS não está aqui: ele fica em vendor/ com hash fixo e é conferido pelo workflow semanal.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    groups:
+      ferramentas-de-teste:
+        patterns: ['@playwright/*', '@axe-core/*', 'jsdom', 'exceljs', 'jszip']
+      ferramentas-de-build:
+        patterns: ['esbuild', 'eslint', '@eslint/*', 'globals']
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    groups:
+      actions:
+        patterns: ['*']

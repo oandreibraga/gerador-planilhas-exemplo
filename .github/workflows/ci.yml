@@ -1,0 +1,178 @@
+# Verificação de cada mudança. Bloqueia o merge se algo falhar (configure "branch protection" na main).
+# Actions fixadas por hash de commit (o comentário diz a versão); o Dependabot propõe as atualizações.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_call:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  NODE_VERSION: '24'
+
+jobs:
+  verificar:
+    name: Verificar (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - run: npm ci --ignore-scripts
+      # ESLint, testes de unidade e integração (inclui suíte do navegador no jsdom, canários, ExcelJS,
+      # fuzz curto, desempenho, CSP), build e conferência dos arquivos publicados.
+      - run: node scripts/verificar.mjs
+        env:
+          DESEMPENHO_FATOR: '3'
+      - name: Build de novo dá os mesmos bytes
+        shell: bash
+        run: |
+          cp dist/SHA256SUMS "$RUNNER_TEMP/somas-1"
+          node scripts/build.mjs > /dev/null
+          diff "$RUNNER_TEMP/somas-1" dist/SHA256SUMS
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: somas-${{ matrix.os }}
+          path: dist/SHA256SUMS
+          retention-days: 7
+
+  reprodutivel:
+    name: Mesmo build no Linux e no Windows
+    needs: verificar
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          pattern: somas-*
+      - run: diff somas-ubuntu-latest/SHA256SUMS somas-windows-latest/SHA256SUMS
+
+  fuzz:
+    name: Arquivos quebrados (fuzz de 2 min)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - run: node --test test/integ/fuzz.test.mjs
+        env:
+          FUZZ_CASOS: '4000'
+          FUZZ_SEMENTE: ${{ github.run_id }}
+
+  libreoffice:
+    name: Amostras abrem no LibreOffice
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - run: sudo apt-get update && sudo apt-get install -y --no-install-recommends libreoffice-calc-nogui
+      - run: node scripts/gerar-amostras.mjs test/saida/amostras
+      - name: Converter cada amostra para .ods (falha se o LibreOffice não conseguir abrir)
+        run: |
+          set -euo pipefail
+          mkdir -p test/saida/ods
+          for f in test/saida/amostras/*.xlsx; do
+            soffice --headless --norestore --convert-to ods --outdir test/saida/ods "$f" > /dev/null
+            alvo="test/saida/ods/$(basename "${f%.xlsx}").ods"
+            if [ ! -s "$alvo" ]; then echo "::error::LibreOffice não abriu $(basename "$f")"; exit 1; fi
+            echo "ok: $(basename "$f")"
+          done
+
+  navegadores:
+    name: Navegadores (Chromium, Firefox, WebKit)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - run: npx playwright install --with-deps chromium firefox webkit
+      - run: node scripts/build.mjs
+      - run: node scripts/gerar-fixtures.mjs
+      # Zero requisições (site e file://), sem internet, CSP sem violações, teste negativo de rede,
+      # Worker de verdade, acessibilidade (axe) e capturas de tela.
+      - run: npx playwright test
+      - if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: relatorio-navegadores
+          path: |
+            playwright-report/
+            test-results/
+            test/e2e/__capturas__/
+          retention-days: 14
+          if-no-files-found: ignore
+
+  codeql:
+    name: CodeQL
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: github/codeql-action/init@2892aa5e19bbd11bc0cff5427e3b750a04d9e3c2 # v4.38.2
+        with:
+          languages: javascript-typescript
+          build-mode: none
+          queries: security-extended
+          config: |
+            paths-ignore:
+              - vendor
+              - node_modules
+      - uses: github/codeql-action/analyze@2892aa5e19bbd11bc0cff5427e3b750a04d9e3c2 # v4.38.2
+        with:
+          category: /language:javascript-typescript
+
+  dependencias:
+    name: Revisão de dependências
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5.0.0
+        with:
+          fail-on-severity: moderate
+          comment-summary-in-pr: on-failure

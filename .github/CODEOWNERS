@@ -1,0 +1,10 @@
+# Quem precisa aprovar mudanças em cada parte. Troque @SEU-USUARIO pelo usuário (ou time) do GitHub
+# e tire o "#" do começo das linhas. Com "branch protection" exigindo revisão do dono, nenhuma mudança
+# nos pontos sensíveis entra sem aprovação.
+#
+# *                    @SEU-USUARIO
+# /src/formatos/       @SEU-USUARIO
+# /vendor/             @SEU-USUARIO
+# /scripts/build.mjs   @SEU-USUARIO
+# /.github/            @SEU-USUARIO
+# /PRIVACIDADE.md      @SEU-USUARIO

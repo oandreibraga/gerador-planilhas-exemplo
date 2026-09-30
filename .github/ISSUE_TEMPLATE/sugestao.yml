@@ -1,0 +1,19 @@
+name: Sugestão
+description: Um tipo de coluna que não foi reconhecido, um formato novo, uma melhoria na tela
+labels: [sugestão]
+body:
+  - type: markdown
+    attributes:
+      value: "**Não cole dados reais.** Descreva com exemplos inventados."
+  - type: textarea
+    id: problema
+    attributes:
+      label: Qual é a necessidade
+      description: O que você está tentando fazer e o que falta hoje.
+    validations:
+      required: true
+  - type: textarea
+    id: exemplo
+    attributes:
+      label: Exemplo inventado
+      description: 'Ex.: coluna "Matrícula" com valores como MAT-000123 deveria ser tratada como código.'

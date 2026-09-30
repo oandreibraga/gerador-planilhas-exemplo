@@ -8,7 +8,7 @@ const QUANTIDADE = Number(process.env.FUZZ_CASOS || 160);
 const SEMENTE = Number(process.env.FUZZ_SEMENTE || 20260930);
 const LIMITE_POR_CASO_MS = 15000;
 
-test('fuzz: ' + QUANTIDADE + ' arquivos quebrados (semente ' + SEMENTE + ')', { timeout: 20 * 60 * 1000 }, async () => {
+test('fuzz: ' + QUANTIDADE + ' arquivos quebrados (semente ' + SEMENTE + ')', { timeout: Math.max(20 * 60 * 1000, QUANTIDADE * 100) }, async () => {
   const problemas = [];
   let atual = null, concluidos = 0;
   await new Promise((resolver, rejeitar) => {

@@ -189,9 +189,13 @@ function montar(raiz, opcoes) {
   // Vigia: se a leitura não responder a tempo (arquivo danificado que trava a biblioteca), o Worker é
   // encerrado e a pessoa recebe uma mensagem clara, sem a página congelar.
   var LIMITE_LEITURA_MS = opcoes.limiteLeituraMs || 180000;
+  // raiz.dataset.leitura diz onde foi a última leitura ("trabalhador" ou "tela"); usado nos testes de navegador.
   function foraDaTela(op, nome, bytes, naTela) {
     var t = criarTrabalhador();
-    if (!t) return Promise.resolve().then(naTela);
+    if (!t) {
+      raiz.dataset.leitura = 'tela';
+      return Promise.resolve().then(naTela);
+    }
     return new Promise(function (ok, falha) {
       var id = proximoPedido++;
       var vigia = setTimeout(function () {
@@ -206,9 +210,9 @@ function montar(raiz, opcoes) {
         falha(e);
       }, LIMITE_LEITURA_MS);
       pedidos[id] = {
-        ok: function (r) { clearTimeout(vigia); ok(r); },
-        falha: function (e) { clearTimeout(vigia); falha(e); },
-        naTela: function () { clearTimeout(vigia); Promise.resolve().then(naTela).then(ok, falha); }
+        ok: function (r) { clearTimeout(vigia); raiz.dataset.leitura = 'trabalhador'; ok(r); },
+        falha: function (e) { clearTimeout(vigia); raiz.dataset.leitura = 'trabalhador'; falha(e); },
+        naTela: function () { clearTimeout(vigia); raiz.dataset.leitura = 'tela'; Promise.resolve().then(naTela).then(ok, falha); }
       };
       t.postMessage({ id: id, op: op, nome: nome, bytes: bytes });
     });
@@ -338,9 +342,9 @@ function montar(raiz, opcoes) {
     h('div', { class: 'faixa-interna' }, [
       h('h1', { text: 'Crie uma cópia da sua planilha com dados falsos' }),
       h('p', { text: 'A ferramenta copia só a estrutura (abas, colunas e formatos) e preenche com dados inventados. ' +
-        'Use o arquivo gerado para pedir automações sem expor informações da empresa.' }),
+        'Use o arquivo gerado para pedir automações ou tirar dúvidas sem expor os dados reais.' }),
       h('p', { class: 'faixa-privacidade' }, [icone('cadeado'),
-        h('span', { text: 'Sua planilha é lida só neste computador. Nada é enviado para a internet e nenhum dado real vai para o arquivo gerado.' })])
+        h('span', { text: 'Sua planilha é lida só neste computador e nada é enviado para a internet. Os valores do arquivo gerado são inventados; nomes de abas, títulos das colunas e listas curtas (como status) continuam como no original.' })])
     ])
   ]);
 

@@ -1,0 +1,48 @@
+name: Algo não funcionou
+description: A ferramenta deu erro, travou ou gerou um arquivo estranho
+labels: [problema]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        **Nunca anexe planilhas reais nem cole dados de pessoas ou clientes aqui.** Esta página é pública.
+        Se precisar mostrar a estrutura, use o botão "Copiar descrição das colunas" (não traz valores reais) ou uma planilha inventada.
+  - type: textarea
+    id: oque
+    attributes:
+      label: O que aconteceu
+      description: O que você fez, o que esperava e o que apareceu (a mensagem de erro, se houver).
+    validations:
+      required: true
+  - type: input
+    id: versao
+    attributes:
+      label: Versão
+      description: "Aparece no rodapé da página (por exemplo, 3.0.0)."
+    validations:
+      required: true
+  - type: dropdown
+    id: como
+    attributes:
+      label: Como abriu a ferramenta
+      options: [Pelo site, Pelo arquivo baixado (offline)]
+    validations:
+      required: true
+  - type: input
+    id: navegador
+    attributes:
+      label: Navegador e sistema
+      placeholder: Edge 140 no Windows 11
+  - type: textarea
+    id: estrutura
+    attributes:
+      label: Estrutura da planilha (opcional)
+      description: Cole aqui o texto de "Copiar descrição das colunas". Confira antes que não há dado real.
+      render: text
+  - type: checkboxes
+    id: confirmo
+    attributes:
+      label: Confirmação
+      options:
+        - label: Não coloquei nenhum dado real (planilha, nome, CPF, e-mail, valor de cliente) nesta issue.
+          required: true

@@ -8,7 +8,7 @@ const REDE = 'O app não pode acessar a rede: tudo roda no computador de quem us
 export default [
   {
     ignores: ['node_modules/', '.ferramentas/', '.npm-cache/', 'dist/', 'vendor/', 'test/saida/', 'test/fixtures/arquivos/',
-      'test-results/', 'playwright-report/', 'temas-internos/', 'fonte/', 'testes/']
+      'test-results/', 'playwright-report/', 'temas-internos/', 'v2-original/']
   },
   js.configs.recommended,
   {

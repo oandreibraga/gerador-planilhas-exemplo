@@ -95,3 +95,10 @@ test('build determinístico: duas montagens dão os mesmos bytes', async () => {
   const outra = await montarApp();
   assert.equal(outra.html, html);
 });
+
+test('versão do SheetJS registrada em vendor/sheetjs/VERSAO confere com o arquivo', async () => {
+  const { XLSX } = await import('../apoio/ambiente.mjs');
+  const fs = await import('node:fs');
+  const registrada = fs.readFileSync(new URL('../../vendor/sheetjs/VERSAO', import.meta.url), 'utf8').trim();
+  assert.equal(XLSX.version, registrada);
+});
