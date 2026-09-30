@@ -38,7 +38,7 @@ try {
 try {
   await import('../../src/dados/cidades.js');
   const { A } = await import('../../src/nucleo/amostra.js');
-  const embutidos = new Set(A.dados.municipios.split(';'));
+  const embutidos = new Set(A.dados.municipios.map((m) => m.nome + '|' + m.uf));
   const lista = JSON.parse((await baixar('https://servicodados.ibge.gov.br/api/v1/localidades/municipios')).toString('utf8'));
   const uf = (m) => (m.microrregiao && m.microrregiao.mesorregiao.UF.sigla) ||
     (m['regiao-imediata'] && m['regiao-imediata']['regiao-intermediaria'].UF.sigla);
