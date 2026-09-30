@@ -571,5 +571,6 @@ A.geradores = {
   codigoComMascara: codigoComMascara,
   sortearPorQuantis: sortearPorQuantis,
   arredondarTempo: arredondarTempo,
-  clonarCelula: clonarCelula
+  clonarCelula: clonarCelula,
+  vazouTexto: vazouTexto
 };

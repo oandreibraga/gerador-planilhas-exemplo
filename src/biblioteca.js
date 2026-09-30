@@ -2,12 +2,15 @@
 import { A } from './nucleo/amostra.js';
 import './dados/ptbr.js';
 import './dados/cidades.js';
+import './dados/nomes-extra.js';
 import './nucleo/util.js';
 import './nucleo/detectar.js';
 import './formatos/zip.js';
 import './formatos/xml.js';
+import './formatos/zipfluxo.js';
 import './formatos/leitura.js';
 import './nucleo/geradores.js';
+import './nucleo/pseudonimo.js';
 import './formatos/amostra.js';
 import './nucleo/resumo.js';
 import './ui/app.js';
