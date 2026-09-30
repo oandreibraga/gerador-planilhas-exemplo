@@ -35,3 +35,23 @@ test('cidades geradas são reais e nunca estão no original', () => {
     assert.ok(!originais.has(A.detectar.nomeLugar(c.v)), c.v + ' veio do original');
   }
 });
+
+test('nomes de aba inválidos (arquivo danificado) viram nomes que o Excel aceita, sem repetir', () => {
+  const longo = 'Relatório mensal de vendas por região e produto';
+  const nomes = [longo, longo + ' (cópia)', 'Custos: 2024/2025', 'History', "'Resumo'", 'resumo', 'x'.repeat(30) + "'abc"];
+  const arq = {
+    nome: 'x.xlsx', base: 'x', ext: 'xlsx', origem: 'arquivo', data1904: false, textosReais: new Set(),
+    abas: nomes.map((nome, i) => ({ nome, indice: i, oculta: 0, linhas: [[{ t: 's', v: 'Código' }], [{ t: 's', v: 'A1' }]], totalLinhas: 2, merges: [], cols: [] }))
+  };
+  A.detectar.analisarArquivo(arq);
+  const { wb } = gerarERelar(arq, 10, 1);
+  assert.equal(wb.SheetNames.length, nomes.length);
+  for (const n of wb.SheetNames) {
+    assert.ok(n.length >= 1 && n.length <= 31, 'tamanho: ' + n);
+    assert.doesNotMatch(n, /[\[\]:*?\/\\]|^'|'$/, 'caracteres: ' + n);
+  }
+  const minusculos = wb.SheetNames.map((n) => n.toLowerCase());
+  assert.equal(new Set(minusculos).size, minusculos.length, 'repetidos: ' + wb.SheetNames.join(' | '));
+  assert.ok(!minusculos.includes('history'));
+  assert.equal(wb.SheetNames[5], 'resumo (2)');
+});

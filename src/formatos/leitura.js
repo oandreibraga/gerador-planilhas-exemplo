@@ -27,6 +27,7 @@ function semExtensao(nome) {
 }
 function nomeAbaValido(nome) {
   var s = String(nome || '').replace(/[\[\]:*?\/\\]/g, ' ').replace(/^'+|'+$/g, '').trim().slice(0, 31);
+  s = s.replace(/^'+|'+$/g, '').trim(); // o corte pode deixar um apóstrofo no fim, que o Excel não aceita
   return s || 'Planilha1';
 }
 

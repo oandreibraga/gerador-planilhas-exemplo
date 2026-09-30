@@ -66,6 +66,7 @@ jobs:
       - run: diff somas-ubuntu-latest/SHA256SUMS somas-windows-latest/SHA256SUMS
 
   fuzz:
+    # Semente fixa: o resultado de um PR não depende de sorte. Sementes aleatórias rodam no semanal.
     name: Arquivos quebrados (fuzz de 2 min)
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -81,7 +82,7 @@ jobs:
       - run: node --test test/integ/fuzz.test.mjs
         env:
           FUZZ_CASOS: '4000'
-          FUZZ_SEMENTE: ${{ github.run_id }}
+          FUZZ_SEMENTE: '20260930'
 
   libreoffice:
     name: Amostras abrem no LibreOffice

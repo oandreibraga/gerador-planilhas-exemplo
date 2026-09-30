@@ -26,6 +26,7 @@ Primeira versão pública.
 - Busca de relações entre colunas ignora colunas vazias (planilhas largas ficam mais rápidas).
 - Leitura que não responde é interrompida em 20 s + 2 s por MB (antes, sempre 3 minutos).
 - Acessibilidade: área de escolha do arquivo sem controle dentro de controle (leitores de tela) e subtítulo do topo com contraste suficiente.
+- Aba com nome que o Excel não aceita (arquivo danificado) impedia gerar a amostra; o nome é ajustado (até 31 caracteres, sem repetir).
 - Arquivo que o navegador não consegue ler do disco (pasta de rede desconectada, arquivo só na nuvem) mostra mensagem clara em vez de "erro inesperado".
 
 ## [2.0.0]

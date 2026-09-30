@@ -5,3 +5,4 @@ vendor/sheetjs/xlsx.full.min.js -text
 *.xlsx binary
 *.xls binary
 *.zip binary
+*.png binary

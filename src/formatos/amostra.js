@@ -189,15 +189,32 @@ function montarAba(aba, n, rng, ctx) {
   return ws;
 }
 
+// Nomes de aba que o Excel aceita: até 31 caracteres, sem : \ / ? * [ ], sem apóstrofo nas pontas, sem
+// repetir (maiúsculas e minúsculas contam como iguais) e diferentes de "History", que o Excel reserva.
+// Nomes que já são válidos ficam como estão; um arquivo danificado pode trazer nomes que não são.
+function nomesDeAba(abas) {
+  var usados = { history: true };
+  return abas.map(function (aba) {
+    var base = A.leitura.nomeAbaValido(aba.nome), nome = base, k = 2;
+    while (usados[nome.toLowerCase()]) {
+      var sufixo = ' (' + (k++) + ')';
+      nome = base.slice(0, 31 - sufixo.length).replace(/'+$/, '') + sufixo;
+    }
+    usados[nome.toLowerCase()] = true;
+    return nome;
+  });
+}
+
 function montar(arquivo, n, semente) {
   var rng = U.criarAleatorio(semente);
   var ctx = { textosReais: arquivo.textosReais || new Set() };
   var wb = { SheetNames: [], Sheets: {}, Workbook: { Sheets: [], WBProps: { date1904: false } } };
+  var nomes = nomesDeAba(arquivo.abas);
   for (var i = 0; i < arquivo.abas.length; i++) {
     var aba = arquivo.abas[i];
-    wb.SheetNames.push(aba.nome);
-    wb.Sheets[aba.nome] = montarAba(aba, n, rng, ctx);
-    wb.Workbook.Sheets.push({ name: aba.nome, Hidden: aba.oculta || 0 });
+    wb.SheetNames.push(nomes[i]);
+    wb.Sheets[nomes[i]] = montarAba(aba, n, rng, ctx);
+    wb.Workbook.Sheets.push({ name: nomes[i], Hidden: aba.oculta || 0 });
   }
   return { wb: wb, semente: rng.semente };
 }
