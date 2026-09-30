@@ -182,15 +182,29 @@ function montar(raiz, opcoes) {
       return null;
     }
   }
+  // Vigia: se a leitura não responder a tempo (arquivo danificado que trava a biblioteca), o Worker é
+  // encerrado e a pessoa recebe uma mensagem clara, sem a página congelar.
+  var LIMITE_LEITURA_MS = opcoes.limiteLeituraMs || 180000;
   function foraDaTela(op, nome, bytes, naTela) {
     var t = criarTrabalhador();
     if (!t) return Promise.resolve().then(naTela);
     return new Promise(function (ok, falha) {
       var id = proximoPedido++;
+      var vigia = setTimeout(function () {
+        if (!pedidos[id]) return;
+        delete pedidos[id];
+        t.terminate();
+        if (trabalhador === t) trabalhador = null;
+        var e = new Error('A leitura demorou demais e foi interrompida. O arquivo pode estar danificado: tente abrir no Excel e salvar de novo.');
+        e.tipo = 'corrompido';
+        e.amigavel = true;
+        e.detalhe = 'sem resposta em ' + Math.round(LIMITE_LEITURA_MS / 1000) + ' s';
+        falha(e);
+      }, LIMITE_LEITURA_MS);
       pedidos[id] = {
-        ok: ok,
-        falha: falha,
-        naTela: function () { Promise.resolve().then(naTela).then(ok, falha); }
+        ok: function (r) { clearTimeout(vigia); ok(r); },
+        falha: function (e) { clearTimeout(vigia); falha(e); },
+        naTela: function () { clearTimeout(vigia); Promise.resolve().then(naTela).then(ok, falha); }
       };
       t.postMessage({ id: id, op: op, nome: nome, bytes: bytes });
     });
@@ -482,9 +496,10 @@ function montar(raiz, opcoes) {
 
   function processarPlanilha(nome, bytes, tamanho, deZip) {
     return foraDaTela('abrir', nome, bytes, function () {
-      var a = A.leitura.abrir({ nome: nome, bytes: bytes });
-      DET.analisarArquivo(a);
-      return a;
+      return A.leitura.abrirSeguro({ nome: nome, bytes: bytes }).then(function (a) {
+        DET.analisarArquivo(a);
+        return a;
+      });
     }).then(function (arq) { return mostrarPlanilha(arq, nome, tamanho, deZip); });
   }
 

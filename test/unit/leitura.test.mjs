@@ -31,11 +31,11 @@ test('mensagens de erro amigáveis', () => {
   }
 });
 
-test('.zip: lista só planilhas (ignora texto, __MACOSX e temporários)', () => {
+test('.zip: lista só planilhas (ignora texto, __MACOSX e temporários)', async () => {
   const fx = fixtures();
-  const itens = A.leitura.listarZip(fx.zips.varias.bytes).map((i) => i.caminho).sort();
+  const itens = (await A.leitura.listarZip(fx.zips.varias.bytes)).map((i) => i.caminho).sort();
   assert.deepEqual(itens, ['entrada/contatos_exemplo.csv', 'vendas_exemplo.xlsx']);
-  const e = erroDe(() => A.leitura.listarZip(fx.zips.nenhuma.bytes));
+  const e = await A.leitura.listarZip(fx.zips.nenhuma.bytes).then(() => null, (x) => x);
   assert.equal(e && e.tipo, 'vazio');
 });
 

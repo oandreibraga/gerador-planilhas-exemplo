@@ -672,7 +672,7 @@ function testarFretes(fx) {
     /depende de A "Tipo Doc": .*MINUTA → MIN-####/.test(txt) && /sempre igual ou posterior/.test(txt) && /= .* × /.test(txt), txt.split('\n').slice(-10).join(' ⏎ '));
 }
 
-function testarErros(fx) {
+async function testarErros(fx) {
   function erroDe(nome, bytes) {
     try { A.leitura.abrir({ nome: nome, bytes: bytes }); return null; } catch (e) { return e; }
   }
@@ -687,13 +687,24 @@ function testarErros(fx) {
   checar('formato não suportado: mensagem clara', e4 && e4.tipo === 'formato', desc(e4));
   var e5 = erroDe('vazio.xlsx', new Uint8Array(0));
   checar('arquivo vazio: mensagem clara', e5 && e5.tipo === 'vazio', desc(e5));
-  var itens = A.leitura.listarZip(fx.zips.varias.bytes);
+  var itens = await A.leitura.listarZip(fx.zips.varias.bytes);
   checar('.zip: encontra só as planilhas (ignora texto, __MACOSX e temporários ~$)',
     igual(itens.map(function (i) { return i.caminho; }).sort(), ['entrada/contatos_exemplo.csv', 'vendas_exemplo.xlsx']),
     JSON.stringify(itens.map(function (i) { return i.caminho; })));
   var e6 = null;
-  try { A.leitura.listarZip(fx.corrompido.bytes); } catch (e) { e6 = e; }
+  try { await A.leitura.listarZip(fx.corrompido.bytes); } catch (e) { e6 = e; }
   checar('.zip danificado: mensagem clara', e6 && e6.tipo === 'corrompido', desc(e6));
+  // zip com bytes trocados no meio do conteúdo compactado: o CRC não bate e a leitura para com mensagem clara
+  var alterado = new Uint8Array(fx.zips.uma.bytes);
+  for (var k = 0; k < 40; k++) alterado[200 + k * 997] ^= 0x5A;
+  var e7 = null;
+  try { await A.leitura.listarZip(alterado); } catch (e) { e7 = e; }
+  checar('.zip com conteúdo danificado (CRC não confere): mensagem clara, sem travar', e7 && e7.tipo === 'corrompido', desc(e7));
+  var xlsxAlterado = new Uint8Array(fx.fretes.bytes);
+  for (var j = 0; j < 40; j++) xlsxAlterado[300 + j * 773] ^= 0x5A;
+  var e8 = null;
+  try { await A.leitura.abrirSeguro({ nome: 'fretes.xlsx', bytes: xlsxAlterado }); } catch (e) { e8 = e; }
+  checar('.xlsx com conteúdo danificado: mensagem clara, sem travar', e8 && e8.tipo === 'corrompido', desc(e8));
 }
 
 function testarColado() {
@@ -949,6 +960,12 @@ function montarDownloads(fx) {
   area.appendChild(todas);
 }
 
+async function etapaAsync(grupo, fn) {
+  grupoAtual = grupo;
+  placar.textContent = 'Executando: ' + grupo + '…';
+  try { return await fn(); } catch (e) { reg('falhou', 'erro inesperado nesta etapa', msgErro(e)); return undefined; }
+}
+
 function etapa(grupo, fn) {
   grupoAtual = grupo;
   placar.textContent = 'Executando: ' + grupo + '…';
@@ -986,7 +1003,7 @@ async function executarTudo() {
       etapa('Fretes no formato CT-e: significado, repetição e ligações (fretes_exemplo.xlsx)', function () { testarFretes(fx); });
       etapa('CSV com ";" e Windows-1252 (contatos_exemplo.csv)', function () { testarCsv(fx); });
       etapa('Excel antigo .xls (legado_exemplo.xls)', function () { testarXls(fx); });
-      etapa('Mensagens de erro', function () { testarErros(fx); });
+      await etapaAsync('Mensagens de erro', function () { return testarErros(fx); });
       etapa('Colar cabeçalho (sem arquivo)', testarColado);
       grupoAtual = 'Interface (mesmo código do gerador-amostra.html)';
       placar.textContent = 'Executando: interface…';

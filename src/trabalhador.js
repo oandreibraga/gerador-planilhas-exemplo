@@ -3,16 +3,15 @@
    Recebe { id, op, nome, bytes } e responde { id, ok, res } ou { id, ok: false, erro }. */
 self.onmessage = function (e) {
   var m = e.data, A = self.Amostra;
-  try {
-    var res;
-    if (m.op === 'listarZip') {
-      res = A.leitura.listarZip(m.bytes);
-    } else {
-      res = A.leitura.abrir({ nome: m.nome, bytes: m.bytes });
-      A.detectar.analisarArquivo(res);
-    }
+  var tarefa = m.op === 'listarZip'
+    ? A.leitura.listarZip(m.bytes)
+    : A.leitura.abrirSeguro({ nome: m.nome, bytes: m.bytes }).then(function (arq) {
+      A.detectar.analisarArquivo(arq);
+      return arq;
+    });
+  Promise.resolve(tarefa).then(function (res) {
     self.postMessage({ id: m.id, ok: true, res: res });
-  } catch (err) {
+  }, function (err) {
     self.postMessage({
       id: m.id,
       ok: false,
@@ -23,5 +22,5 @@ self.onmessage = function (e) {
         amigavel: !!(err && err.amigavel)
       }
     });
-  }
+  });
 };

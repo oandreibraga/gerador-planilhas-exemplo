@@ -27,6 +27,7 @@ export function rodar({ limiteMs = 240000 } = {}) {
         // APIs do navegador que o jsdom não expõe dentro da janela
         if (!w.TextDecoder) w.TextDecoder = TextDecoder;
         if (!w.TextEncoder) w.TextEncoder = TextEncoder;
+        if (!w.DecompressionStream) w.DecompressionStream = DecompressionStream;
         if (!w.crypto || !w.crypto.getRandomValues) Object.defineProperty(w, 'crypto', { value: webcrypto, configurable: true });
       }
     });

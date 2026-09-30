@@ -323,12 +323,20 @@ leitura.deCabecalho = function (texto, nomeAba, nomeArquivo) {
   };
 };
 
-// Lista as planilhas de dentro de um .zip (ignora pastas, arquivos do macOS e temporários do Excel).
-leitura.ehZip = function (nome) { return extensao(nome) === 'zip'; };
-leitura.listarZip = function (bytes) {
-  bytes = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes);
-  if (!bytes.length) throw erro('vazio', 'Este arquivo .zip está em branco.');
-  if (!ehZip(bytes)) throw erro('corrompido', 'Este arquivo não é um .zip válido. Tente compactar de novo.', 'assinatura desconhecida');
+// Planilhas de dentro de um .zip (ignora pastas, arquivos do macOS, temporários do Excel e o que não é planilha).
+// Usa o leitor de zip próprio (confere CRC de cada parte); se o navegador não souber descompactar, usa o do SheetJS.
+function filtrarItensZip(lista) {
+  var itens = lista.filter(function (it) {
+    if (/(^|\/)(__MACOSX|\.)/.test(it.caminho) || /(^|\/)~\$/.test(it.caminho)) return false;
+    var ext = extensao(it.caminho);
+    return !!EXT_PLANILHA[ext] || ext === 'csv';
+  });
+  itens.sort(function (a, b) { return a.caminho.localeCompare(b.caminho, 'pt-BR'); });
+  if (!itens.length) throw erro('vazio', 'Não encontramos nenhuma planilha (.xlsx, .xls ou .csv) dentro deste .zip.');
+  return itens;
+}
+
+function listarZipPeloSheetJS(bytes) {
   var pasta;
   try {
     pasta = XLSX.CFB.read(bytes, { type: 'array' });
@@ -337,18 +345,46 @@ leitura.listarZip = function (bytes) {
     if (/encrypt|passw/i.test(msg)) throw erro('senha', 'Este .zip tem senha. Descompacte no computador e envie a planilha diretamente.', msg);
     throw erro('corrompido', 'Não foi possível descompactar este .zip. Ele pode estar danificado.', msg);
   }
-  var itens = [];
+  var lista = [];
   pasta.FileIndex.forEach(function (f, i) {
     if (f.type !== 2 || !f.content || !f.content.length) return;
     var caminho = String(pasta.FullPaths[i] || f.name).replace(/^[^\/]*\//, '');
-    if (/(^|\/)(__MACOSX|\.)/.test(caminho) || /(^|\/)~\$/.test(caminho)) return;
-    var ext = extensao(caminho);
-    if (!EXT_PLANILHA[ext] && ext !== 'csv') return;
-    itens.push({ nome: caminho.split('/').pop(), caminho: caminho, tamanho: f.content.length, bytes: new Uint8Array(f.content) });
+    lista.push({ nome: caminho.split('/').pop(), caminho: caminho, tamanho: f.content.length, bytes: new Uint8Array(f.content) });
   });
-  itens.sort(function (a, b) { return a.caminho.localeCompare(b.caminho, 'pt-BR'); });
-  if (!itens.length) throw erro('vazio', 'Não encontramos nenhuma planilha (.xlsx, .xls ou .csv) dentro deste .zip.');
-  return itens;
+  return filtrarItensZip(lista);
+}
+
+leitura.ehZip = function (nome) { return extensao(nome) === 'zip'; };
+
+leitura.listarZip = async function (bytes) {
+  bytes = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes);
+  if (!bytes.length) throw erro('vazio', 'Este arquivo .zip está em branco.');
+  if (!ehZip(bytes)) throw erro('corrompido', 'Este arquivo não é um .zip válido. Tente compactar de novo.', 'assinatura desconhecida');
+  if (!A.zip.disponivel()) return listarZipPeloSheetJS(bytes);
+  var indice = A.zip.lerIndice(bytes);
+  var candidatos = filtrarItensZip(indice.filter(function (e) { return !/\/$/.test(e.nome); }).map(function (e) {
+    return { nome: e.nome.split('/').pop(), caminho: e.nome, tamanho: e.tamanho, entrada: e };
+  }));
+  for (var i = 0; i < candidatos.length; i++) {
+    candidatos[i].bytes = await A.zip.extrair(bytes, candidatos[i].entrada);
+    delete candidatos[i].entrada;
+  }
+  return candidatos;
+};
+
+// Confere o zip de dentro de .xlsx/.xlsm/.xlsb/.ods antes de entregar ao SheetJS (que pode travar com zip corrompido).
+leitura.validarConteiner = async function (nome, bytes) {
+  var ext = extensao(nome);
+  if ((ext === 'xlsx' || ext === 'xlsm' || ext === 'xlsb' || ext === 'ods') && ehZip(bytes) && A.zip.disponivel()) {
+    await A.zip.validar(bytes);
+  }
+};
+
+// Caminho usado pela tela e pelo Worker: valida o contêiner e depois lê.
+leitura.abrirSeguro = async function (entrada) {
+  var bytes = entrada.bytes instanceof Uint8Array ? entrada.bytes : new Uint8Array(entrada.bytes);
+  await leitura.validarConteiner(entrada.nome, bytes);
+  return leitura.abrir({ nome: entrada.nome, bytes: bytes });
 };
 
 leitura.nomeAbaValido = nomeAbaValido;
