@@ -39,7 +39,8 @@ export const violacoes = (page) => page.evaluate(() => window.__violacoes || [])
 
 export async function abrirApp(page, url) {
   await page.goto(url);
-  await expect(page.getByRole('button', { name: 'Escolher planilha' })).toBeVisible();
+  // A área de escolha (label com role=button); o <input type=file> escondido dentro dela tem o mesmo nome
+  await expect(page.locator('label.dropzone')).toBeVisible();
 }
 
 export async function carregarPlanilha(page, nome) {

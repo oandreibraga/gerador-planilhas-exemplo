@@ -97,3 +97,17 @@ test('sem internet: o site continua funcionando depois de carregado', async ({ p
   expect(await vazamentos(saida.bytes, 'contatos_exemplo.csv')).toEqual([]);
   expect(rede.externos()).toEqual([]);
 });
+
+test('arquivo que trava a biblioteca de leitura: o vigia interrompe e mostra mensagem clara', async ({ page, context }) => {
+  test.setTimeout(150000);
+  const rede = await vigiarRede(context, MODOS[0].url);
+  await abrirApp(page, MODOS[0].url);
+  await carregarPlanilha(page, 'trava_leitura.xls');
+  // Arquivo pequeno: vigia de 20 s. A tela continua respondendo enquanto isso (a leitura está no Worker).
+  await expect(page.locator('#app')).not.toHaveAttribute('data-leitura', 'tela');
+  await expect(page.getByRole('alert')).toContainText(/demorou demais/, { timeout: 60000 });
+  await carregarPlanilha(page, 'fretes_exemplo.xlsx');
+  await esperarEstrutura(page);
+  await expect(page.locator('#app')).toHaveAttribute('data-leitura', 'trabalhador');
+  expect(rede.externos()).toEqual([]);
+});

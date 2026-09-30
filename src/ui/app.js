@@ -187,8 +187,13 @@ function montar(raiz, opcoes) {
     }
   }
   // Vigia: se a leitura não responder a tempo (arquivo danificado que trava a biblioteca), o Worker é
-  // encerrado e a pessoa recebe uma mensagem clara, sem a página congelar.
-  var LIMITE_LEITURA_MS = opcoes.limiteLeituraMs || 180000;
+  // encerrado e a pessoa recebe uma mensagem clara, sem a página congelar. O prazo cresce com o tamanho:
+  // 20 s + 2 s por MB, até 3 min (um arquivo pequeno e danificado não deixa a pessoa esperando muito).
+  function limiteLeitura(bytes) {
+    if (opcoes.limiteLeituraMs) return opcoes.limiteLeituraMs;
+    var mb = ((bytes && bytes.byteLength) || 0) / 1048576;
+    return Math.min(180000, Math.round(20000 + 2000 * mb));
+  }
   // raiz.dataset.leitura diz onde foi a última leitura ("trabalhador" ou "tela"); usado nos testes de navegador.
   function foraDaTela(op, nome, bytes, naTela) {
     var t = criarTrabalhador();
@@ -197,7 +202,7 @@ function montar(raiz, opcoes) {
       return Promise.resolve().then(naTela);
     }
     return new Promise(function (ok, falha) {
-      var id = proximoPedido++;
+      var id = proximoPedido++, limite = limiteLeitura(bytes);
       var vigia = setTimeout(function () {
         if (!pedidos[id]) return;
         delete pedidos[id];
@@ -206,9 +211,9 @@ function montar(raiz, opcoes) {
         var e = new Error('A leitura demorou demais e foi interrompida. O arquivo pode estar danificado: tente abrir no Excel e salvar de novo.');
         e.tipo = 'corrompido';
         e.amigavel = true;
-        e.detalhe = 'sem resposta em ' + Math.round(LIMITE_LEITURA_MS / 1000) + ' s';
+        e.detalhe = 'sem resposta em ' + Math.round(limite / 1000) + ' s';
         falha(e);
-      }, LIMITE_LEITURA_MS);
+      }, limite);
       pedidos[id] = {
         ok: function (r) { clearTimeout(vigia); raiz.dataset.leitura = 'trabalhador'; ok(r); },
         falha: function (e) { clearTimeout(vigia); raiz.dataset.leitura = 'trabalhador'; falha(e); },
@@ -299,6 +304,7 @@ function montar(raiz, opcoes) {
     senha: 'Esta planilha tem senha',
     corrompido: 'Não foi possível abrir este arquivo',
     formato: 'Tipo de arquivo não aceito',
+    grande: 'Arquivo grande demais',
     vazio: 'Não há nada para ler'
   };
   function mostrarErro(e) {

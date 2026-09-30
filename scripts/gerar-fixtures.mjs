@@ -5,7 +5,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { raiz } from '../test/apoio/ambiente.mjs';
-import { fixtures } from '../test/fixtures/definicoes.js';
+import { fixtures, xlsQueTravaSheetJS } from '../test/fixtures/definicoes.js';
 import { canariosDe } from '../test/fixtures/canarios.js';
 
 const destino = path.join(raiz, 'test', 'fixtures', 'arquivos');
@@ -22,7 +22,9 @@ const arquivos = [
   [fx.zips.nenhuma.nome, fx.zips.nenhuma.bytes],
   [fx.senha.nome, fx.senha.bytes],
   [fx.corrompido.nome, fx.corrompido.bytes],
-  [fx.zipQuebrado.nome, fx.zipQuebrado.bytes]
+  [fx.zipQuebrado.nome, fx.zipQuebrado.bytes],
+  // Trava a biblioteca de leitura: só para o teste do vigia no navegador (nunca abrir fora do app)
+  ['trava_leitura.xls', xlsQueTravaSheetJS(fx.xls.bytes)]
 ];
 for (const [nome, bytes] of arquivos) fs.writeFileSync(path.join(destino, nome), bytes);
 

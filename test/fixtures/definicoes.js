@@ -281,6 +281,24 @@ function arquivoComSenha() {
   return out instanceof Uint8Array ? out : new Uint8Array(out);
 }
 
+// .xls que trava a SheetJS (achado do fuzz): o registro ITERATION (0x0011) vira 0x0021, e o leitor de
+// fórmulas da biblioteca entra em laço sem fim. Serve para provar que o vigia do app interrompe a leitura.
+// NUNCA abrir fora de um Worker com vigia.
+function xlsQueTravaSheetJS(bytes) {
+  var cfb = XLSX.CFB.read(bytes, { type: 'array' });
+  var i = cfb.FullPaths.findIndex(function (p) { return /\/Workbook$/.test(p); });
+  var livro = new Uint8Array(cfb.FileIndex[i].content), pos = 0, feito = false;
+  while (pos + 4 <= livro.length && !feito) {
+    var tipo = livro[pos] | (livro[pos + 1] << 8), tam = livro[pos + 2] | (livro[pos + 3] << 8);
+    if (tipo === 0x0011 && tam === 2) { livro[pos] = 0x21; feito = true; }
+    pos += 4 + tam;
+  }
+  if (!feito) throw new Error('registro ITERATION não encontrado no .xls de exemplo');
+  cfb.FileIndex[i].content = livro;
+  var out = XLSX.CFB.write(cfb, { type: 'array' });
+  return out instanceof Uint8Array ? out : new Uint8Array(out);
+}
+
 function montarZip(arquivos) {
   var cfb = XLSX.CFB.utils.cfb_new();
   arquivos.forEach(function (a) { XLSX.CFB.utils.cfb_add(cfb, '/' + a[0], a[1]); });
@@ -324,4 +342,4 @@ function fixtures() {
 }
 
 
-export { definirVendas, definirCsv, definirFretes, definirXls, montarAbaFixture, escreverPlanilha, arquivoComSenha, montarZip, fixtures, redefinirFixtures };
+export { definirVendas, definirCsv, definirFretes, definirXls, montarAbaFixture, escreverPlanilha, arquivoComSenha, montarZip, xlsQueTravaSheetJS, fixtures, redefinirFixtures };

@@ -8,7 +8,9 @@ var DIA_MS = 86400000;
 A.LIMITES = {
   AMOSTRA: 500,        // linhas de dados analisadas por aba
   BUSCA_CABECALHO: 50, // linhas onde o cabeçalho é procurado
-  LINHAS_LIDAS: 551    // linhas lidas do arquivo por aba (cabeçalho + amostra)
+  LINHAS_LIDAS: 551,   // linhas lidas do arquivo por aba (cabeçalho + amostra)
+  COLUNAS: 16384,      // máximo de colunas do Excel (A até XFD)
+  COLUNAS_XLS: 256     // máximo de colunas do .xls antigo (A até IV)
 };
 
 // ---------- texto ----------

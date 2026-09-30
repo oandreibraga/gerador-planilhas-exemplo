@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { A } from '../apoio/ambiente.mjs';
+import { A, XLSX } from '../apoio/ambiente.mjs';
 import { fixtures } from '../fixtures/definicoes.js';
 
 function erroDe(fn) {
@@ -37,6 +37,50 @@ test('.zip: lista só planilhas (ignora texto, __MACOSX e temporários)', async 
   assert.deepEqual(itens, ['entrada/contatos_exemplo.csv', 'vendas_exemplo.xlsx']);
   const e = await A.leitura.listarZip(fx.zips.nenhuma.bytes).then(() => null, (x) => x);
   assert.equal(e && e.tipo, 'vazio');
+});
+
+// .xls com uma célula "empurrada" para a coluna 50.000 (achado do fuzz: travava a análise de colunas)
+function xlsComColunaImpossivel(bytes) {
+  const cfb = XLSX.CFB.read(bytes, { type: 'array' });
+  const i = cfb.FullPaths.findIndex((p) => /\/Workbook$/.test(p));
+  const livro = new Uint8Array(cfb.FileIndex[i].content);
+  const CELULAS = new Set([0x00FD, 0x0203, 0x027E, 0x0204, 0x0205]);
+  let pos = 0, feito = false;
+  while (pos + 4 <= livro.length && !feito) {
+    const tipo = livro[pos] | (livro[pos + 1] << 8), tam = livro[pos + 2] | (livro[pos + 3] << 8);
+    if (CELULAS.has(tipo)) { livro[pos + 6] = 50000 & 0xFF; livro[pos + 7] = 50000 >> 8; feito = true; }
+    pos += 4 + tam;
+  }
+  assert.ok(feito, 'nenhuma célula encontrada no .xls de exemplo');
+  cfb.FileIndex[i].content = livro;
+  return new Uint8Array(XLSX.CFB.write(cfb, { type: 'array' }));
+}
+
+test('coluna além do limite do formato: mensagem clara, sem travar', () => {
+  const fx = fixtures();
+  const inicio = Date.now();
+  const e = erroDe(() => A.leitura.abrir({ nome: 'legado.xls', bytes: xlsComColunaImpossivel(fx.xls.bytes) }));
+  assert.ok(e && e.amigavel, '.xls com coluna 50.000 deveria dar erro amigável');
+  assert.equal(e.tipo, 'corrompido');
+  const csv = new TextEncoder().encode(Array.from({ length: 16385 }, (_, k) => 'c' + k).join(';') + '\n' + '1;'.repeat(16384) + '1\n');
+  const e2 = erroDe(() => A.leitura.abrir({ nome: 'largo.csv', bytes: csv }));
+  assert.ok(e2 && e2.amigavel, 'CSV com 16.385 colunas deveria dar erro amigável');
+  assert.equal(e2.tipo, 'grande');
+  const e3 = erroDe(() => A.leitura.deCabecalho(Array.from({ length: 16385 }, (_, k) => 'c' + k).join('\t'), 'P', 'x'));
+  assert.equal(e3 && e3.tipo, 'grande');
+  assert.ok(Date.now() - inicio < 5000, 'demorou ' + (Date.now() - inicio) + ' ms');
+});
+
+test('muitas colunas vazias entre as preenchidas: análise rápida', () => {
+  const linhas = [['Código', 'Nome'], ['A1', 'Ana'], ['A2', 'Bia']].map((l) => {
+    const r = []; r[0] = { t: 's', v: l[0] }; r[9000] = { t: 's', v: l[1] }; return r;
+  });
+  const arq = { nome: 'x.xlsx', base: 'x', ext: 'xlsx', origem: 'arquivo', data1904: false, textosReais: new Set(),
+    abas: [{ nome: 'P', indice: 0, oculta: 0, linhas, totalLinhas: 3, merges: [], cols: [] }] };
+  const inicio = Date.now();
+  A.detectar.analisarArquivo(arq);
+  assert.equal(arq.abas[0].colunas.length, 9001);
+  assert.ok(Date.now() - inicio < 5000, 'demorou ' + (Date.now() - inicio) + ' ms');
 });
 
 test('cabeçalho colado do Excel (tab e aspas)', () => {

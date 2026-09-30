@@ -327,8 +327,10 @@ function construirColunas(aba, arquivo) {
 }
 
 // Relações entre colunas da mesma linha que a amostra precisa manter.
-function detectarRelacoes(cols, nDados) {
+function detectarRelacoes(todas, nDados) {
   var rel = [], i, j, r;
+  // Colunas vazias nunca entram em relação; tirá-las evita comparar milhares de pares à toa
+  var cols = todas.filter(function (c) { return c.tipoDetectado !== 'vazia'; });
   function norm(c) { return c.t === 's' ? U.normalizar(c.v) : c.t + ':' + c.v; }
   for (i = 0; i < cols.length; i++) {
     for (j = i + 1; j < cols.length; j++) {

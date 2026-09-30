@@ -1,5 +1,6 @@
 // Executado numa thread separada pelo fuzz.test.mjs: monta arquivos quebrados de propósito e tenta abrir cada um.
-// Manda uma mensagem por caso, para que um travamento aponte exatamente qual caso travou.
+// Avisa o início de cada caso e de cada etapa, para que um travamento aponte o caso e a etapa exatos.
+// Etapas: "conteiner" (nosso leitor de zip), "sheetjs" (biblioteca externa + montagem), "analise", "gerar".
 import { parentPort, workerData } from 'node:worker_threads';
 import JSZip from 'jszip';
 import { A } from '../apoio/ambiente.mjs';
@@ -52,17 +53,33 @@ zipInfla.file('xl/worksheets/sheet1.xml', '<worksheet xmlns="http://schemas.open
   ' '.repeat(20 * 1024 * 1024) + '</sheetData></worksheet>');
 adicionar('zip que infla 20 MB', 'infla.xlsx', await zipInfla.generateAsync({ type: 'uint8array', compression: 'DEFLATE' }));
 
+const etapa = (nome) => parentPort.postMessage({ tipo: 'etapa', etapa: nome });
+
+// Mesmo caminho do app: contêiner validado por nós, leitura pela biblioteca (no Worker, com vigia),
+// análise (no Worker) e geração (na tela, sem vigia: não pode travar nunca).
+async function abrirEAnalisar(nome, bytes) {
+  etapa('conteiner');
+  await A.leitura.validarConteiner(nome, bytes);
+  etapa('sheetjs');
+  const arq = A.leitura.abrir({ nome, bytes });
+  etapa('analise');
+  A.detectar.analisarArquivo(arq);
+  return arq;
+}
+
 parentPort.postMessage({ tipo: 'total', total: casos.length });
-for (const caso of casos) {
-  parentPort.postMessage({ tipo: 'inicio', nome: caso.nome });
+for (let i = workerData.inicio || 0; i < casos.length; i++) {
+  const caso = casos[i];
+  parentPort.postMessage({ tipo: 'inicio', nome: caso.nome, indice: i });
   let resultado;
   try {
     if (/\.zip$/.test(caso.arquivo)) {
+      etapa('conteiner');
       const itens = await A.leitura.listarZip(caso.bytes);
-      for (const it of itens) { const arq = await A.leitura.abrirSeguro({ nome: it.nome, bytes: it.bytes }); A.detectar.analisarArquivo(arq); }
+      for (const it of itens) await abrirEAnalisar(it.nome, it.bytes);
     } else {
-      const arq = await A.leitura.abrirSeguro({ nome: caso.arquivo, bytes: caso.bytes });
-      A.detectar.analisarArquivo(arq);
+      const arq = await abrirEAnalisar(caso.arquivo, caso.bytes);
+      etapa('gerar');
       A.saida.gerar(arq, 10, 1);
     }
     resultado = { ok: true };

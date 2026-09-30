@@ -22,6 +22,9 @@ Primeira versão pública.
 
 ### Corrigido
 - "Estado civil" voltou a ser reconhecido como lista de opções (e não como UF).
+- Arquivo danificado com uma célula numa coluna impossível (ex.: coluna 50.000 num .xls) travava a análise; agora dá a mensagem de arquivo danificado na hora.
+- Busca de relações entre colunas ignora colunas vazias (planilhas largas ficam mais rápidas).
+- Leitura que não responde é interrompida em 20 s + 2 s por MB (antes, sempre 3 minutos).
 
 ## [2.0.0]
 

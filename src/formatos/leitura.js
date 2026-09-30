@@ -260,6 +260,19 @@ function lerCsv(nome, bytes) {
   };
 }
 
+// Nenhuma aba pode passar do número de colunas que o formato permite. Um arquivo danificado pode "pôr"
+// uma célula na coluna 50.000; sem este limite, a análise criaria dezenas de milhares de colunas e travaria.
+function conferirColunas(arq, limite, tipo, mensagem) {
+  arq.abas.forEach(function (aba) {
+    aba.linhas.forEach(function (linha) {
+      if (linha && linha.length > limite) throw erro(tipo, mensagem, 'célula na coluna ' + linha.length + ' (limite ' + limite + ')');
+    });
+    aba.merges = aba.merges.filter(function (m) { return m.e.c < limite; });
+  });
+  return arq;
+}
+var MSG_COLUNAS = 'Esta planilha tem mais colunas do que o Excel aceita (16.384). Confira o arquivo e tente de novo.';
+
 // ---------- API ----------
 leitura.abrir = function (entrada) {
   leitura.contador++;
@@ -267,7 +280,7 @@ leitura.abrir = function (entrada) {
   var bytes = entrada.bytes instanceof Uint8Array ? entrada.bytes : new Uint8Array(entrada.bytes);
   var ext = extensao(nome);
   if (!bytes.length) throw erro('vazio', 'Este arquivo está em branco (0 bytes).');
-  if (ext === 'csv' || ext === 'txt') return lerCsv(nome, bytes);
+  if (ext === 'csv' || ext === 'txt') return conferirColunas(lerCsv(nome, bytes), L.COLUNAS, 'grande', MSG_COLUNAS);
   if (!EXT_PLANILHA[ext]) {
     throw erro('formato', 'Este tipo de arquivo' + (ext ? ' (.' + ext + ')' : '') + ' não é aceito. Use uma planilha .xlsx, .xls ou .csv, ou um .zip com planilhas.');
   }
@@ -290,7 +303,10 @@ leitura.abrir = function (entrada) {
     throw traduzirErro(e, ext, cfb);
   }
   if (!wb || !wb.SheetNames || !wb.SheetNames.length) throw erro('corrompido', MSG_CORROMPIDO, 'nenhuma aba');
-  return montarArquivo(nome, ext, wb);
+  // .xls antigo (contêiner CFB) tem no máximo 256 colunas: além disso, o arquivo está danificado
+  return cfb
+    ? conferirColunas(montarArquivo(nome, ext, wb), L.COLUNAS_XLS, 'corrompido', MSG_CORROMPIDO)
+    : conferirColunas(montarArquivo(nome, ext, wb), L.COLUNAS, 'grande', MSG_COLUNAS);
 };
 
 leitura.deCabecalho = function (texto, nomeAba, nomeArquivo) {
@@ -300,6 +316,7 @@ leitura.deCabecalho = function (texto, nomeAba, nomeArquivo) {
   var reg = lerRegistros(texto, '\t', 1)[0] || [];
   while (reg.length && reg[reg.length - 1].trim() === '') reg.pop();
   if (!reg.length) throw erro('vazio', 'Não encontramos nenhum título de coluna no texto colado.');
+  if (reg.length > L.COLUNAS) throw erro('grande', 'O texto colado tem mais títulos do que o Excel aceita (16.384 colunas).');
   var linha = [];
   for (var c = 0; c < reg.length; c++) if (reg[c].trim() !== '') linha[c] = { t: 's', v: reg[c] };
   var base = semExtensao(String(nomeArquivo || '').trim() || 'cabecalho');
