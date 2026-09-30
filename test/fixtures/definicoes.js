@@ -1,6 +1,6 @@
 // Planilhas de exemplo com dados inventados (sementes fixas). Usadas pelo teste no navegador e pelos testes em Node.
 // Precisa do SheetJS disponível como `XLSX` global.
-import { RNG, pad, serialDe, partes, dataBR, dataISO, dataBRValida, numBR, r2, logUnif, ponderado, semAcentoT, igual, pct, log10, chaveN, quadro, dvCpfT, dvCnpjT, dvChaveT, cpfValidoT, cnpjValidoT, cpfT, cnpjT, mascCpf, mascCnpj, cp1252, bytesAleatorios, NOMES_T, SOBRENOMES_T, PALAVRAS_T, DDDS_T, RE_NOME, RE_EMAIL_T, frase, coluna } from './auxiliares.js';
+import { RNG, pad, serialDe, dataBR, dataISO, dataBRValida, numBR, r2, logUnif, ponderado, semAcentoT, dvChaveT, cpfValidoT, cnpjValidoT, cpfT, cnpjT, mascCpf, mascCnpj, cp1252, bytesAleatorios, NOMES_T, SOBRENOMES_T, DDDS_T, RE_NOME, RE_EMAIL_T, frase, coluna } from './auxiliares.js';
 // ================= planilhas de exemplo (dados inventados) =================
 function definirVendas() {
   var R = RNG(20240601);

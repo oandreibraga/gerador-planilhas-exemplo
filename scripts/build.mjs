@@ -30,14 +30,14 @@ export function lerSheetJS() {
 }
 
 // Impede que o código embutido feche a tag <script> ou abra comentário HTML.
-function escaparScript(s) {
+export function escaparScript(s) {
   return s.replace(/<\/(script)/gi, '<\\/$1').replace(/<!--/g, '<\\!--');
 }
 function escaparHtml(s) {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
-async function empacotar(entrada) {
+export async function empacotar(entrada) {
   const r = await esbuild.build({
     entryPoints: [path.join(raiz, entrada)],
     bundle: true,
@@ -91,7 +91,18 @@ export async function montarApp(opcoes) {
     if (!html.includes(marca)) throw new Error('marcador ausente em src/ui/pagina.html: ' + marca);
     html = html.split(marca).join(valor);
   }
+  conferirHashes(html, csp, hash);
   return { html, csp };
+}
+
+// O navegador calcula o hash sobre o texto exato entre as tags (espaços e quebras de linha contam).
+// Se algum script executável ou estilo não tiver o hash liberado, a página abriria quebrada: o build falha.
+function conferirHashes(html, csp, hash) {
+  const blocos = [...html.matchAll(/<(script|style)([^>]*)>([\s\S]*?)<\/\1>/g)];
+  for (const [, tag, atributos, conteudo] of blocos) {
+    if (tag === 'script' && /type="text\/plain"/.test(atributos)) continue;
+    if (!csp.includes(hash(conteudo))) throw new Error('CSP sem o hash de um <' + tag + atributos + '> embutido');
+  }
 }
 
 export async function montarTestes() {

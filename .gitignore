@@ -22,3 +22,4 @@ Thumbs.db
 
 # configurações locais do Claude Code
 .claude/settings.local.json
+test/fixtures/arquivos/

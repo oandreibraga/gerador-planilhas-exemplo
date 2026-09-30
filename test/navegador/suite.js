@@ -1,6 +1,6 @@
 // Suíte de testes que roda na página dist/testes.html (navegador de verdade ou jsdom).
-import { RNG, pad, serialDe, partes, dataBR, dataISO, dataBRValida, numBR, r2, logUnif, ponderado, semAcentoT, igual, pct, log10, chaveN, quadro, dvCpfT, dvCnpjT, dvChaveT, cpfValidoT, cnpjValidoT, cpfT, cnpjT, mascCpf, mascCnpj, cp1252, bytesAleatorios, NOMES_T, SOBRENOMES_T, PALAVRAS_T, DDDS_T, RE_NOME, RE_EMAIL_T, frase, coluna } from '../fixtures/auxiliares.js';
-import { definirVendas, definirCsv, definirFretes, definirXls, montarAbaFixture, escreverPlanilha, arquivoComSenha, montarZip, fixtures, redefinirFixtures } from '../fixtures/definicoes.js';
+import { semAcentoT, igual, pct, log10, chaveN, quadro, dvChaveT, cpfValidoT } from '../fixtures/auxiliares.js';
+import { fixtures, redefinirFixtures } from '../fixtures/definicoes.js';
 var A = window.Amostra || {};
 var SEMENTES = [11, 22, 33];
 var ISENTOS = new Set(['Sim', 'Não', 'S', 'N']);
@@ -160,7 +160,6 @@ function conferirSaida(def, wb, n, ag, opts) {
         function () { return rot + ' "' + a.nome + '": gerado ' + pct(iguais / (ambos || 1)) + ', original ' + pct(ig.taxa); });
     }
     a.colunas.forEach(function (dc, j) {
-      var c3 = (a.colInicio || 0) + j;
       var cels = linhasGeradas.map(function (l) { return l[j]; });
       if (opts.manter && opts.manter[a.nome + '|' + dc.nome]) {
         var amostra = linhasAmostra(a, dc);
@@ -1033,7 +1032,7 @@ btnCopiar.addEventListener('click', function () {
     ta.value = ultimoRelatorio;
     ta.style.position = 'fixed'; ta.style.opacity = '0';
     document.body.appendChild(ta); ta.select();
-    var ok = false;
+    var ok;
     try { ok = document.execCommand('copy'); } catch (e) { ok = false; }
     ta.remove();
     feito(ok);

@@ -33,7 +33,6 @@ function h(tag, props, filhos) {
       if (v == null || v === false) return;
       if (k === 'class') el.className = v;
       else if (k === 'text') el.textContent = v;
-      else if (k === 'html') el.innerHTML = v;
       else if (k.slice(0, 2) === 'on') el.addEventListener(k.slice(2), v);
       else if (PROPS[k]) el[k] = v;
       else el.setAttribute(k, v === true ? '' : String(v));
@@ -48,7 +47,12 @@ function h(tag, props, filhos) {
   return el;
 }
 
-function icone(nome) { return h('span', { class: 'ico', html: ICONES[nome] }); }
+// Único uso de innerHTML: desenhos SVG fixos de ICONES (nunca texto vindo do arquivo ou da pessoa).
+function icone(nome) {
+  var el = h('span', { class: 'ico' });
+  el.innerHTML = ICONES[nome]; // eslint-disable-line no-restricted-properties
+  return el;
+}
 function giro() { return h('span', { class: 'giro', 'aria-hidden': 'true' }); }
 
 function proximoQuadro() {
@@ -92,7 +96,7 @@ function copiarTexto(texto) {
     ta.style.opacity = '0';
     document.body.appendChild(ta);
     ta.select();
-    var ok = false;
+    var ok;
     try { ok = document.execCommand('copy'); } catch (e) { ok = false; }
     ta.remove();
     if (!ok) throw new Error('O navegador não deixou copiar automaticamente.');
@@ -324,7 +328,7 @@ function montar(raiz, opcoes) {
   var topo = h('header', { class: 'topo' }, [
     h('div', { class: 'topo-interno' }, [
       h('div', { class: 'marca' }, [
-        h('span', { class: 'marca-linha1', html: 'GERADOR DE <b>PLANILHAS</b>' }),
+        h('span', { class: 'marca-linha1' }, ['GERADOR DE ', h('b', { text: 'PLANILHAS' })]),
         h('span', { class: 'marca-linha2', text: 'de exemplo' })
       ]),
       h('span', { class: 'selo' }, [icone('cadeado'), h('span', { text: 'Funciona sem internet' })])

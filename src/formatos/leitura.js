@@ -295,7 +295,7 @@ leitura.abrir = function (entrada) {
 
 leitura.deCabecalho = function (texto, nomeAba, nomeArquivo) {
   leitura.contador++;
-  texto = String(texto || '').replace(/^﻿/, '');
+  texto = String(texto || '').replace(/^\uFEFF/, '');
   if (!texto.trim()) throw erro('vazio', 'Cole primeiro os títulos das colunas, copiados do Excel.');
   var reg = lerRegistros(texto, '\t', 1)[0] || [];
   while (reg.length && reg[reg.length - 1].trim() === '') reg.pop();

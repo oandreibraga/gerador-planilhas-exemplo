@@ -197,7 +197,6 @@ function descreverLinhasAcima(aba) {
 }
 
 function texto(arquivo) {
-  var DET = A.detectar;
   var out = [];
   out.push('ESTRUTURA DA PLANILHA: ' + arquivo.nome);
   out.push(AVISO_AMOSTRA);

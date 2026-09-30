@@ -8,17 +8,14 @@ import { JSDOM, VirtualConsole } from 'jsdom';
 
 const raiz = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const arquivo = path.join(raiz, 'dist', 'testes.html');
-if (!fs.existsSync(arquivo)) {
-  console.error('dist/testes.html não existe. Rode antes: node scripts/build.mjs');
-  process.exit(2);
-}
 
-export function rodar({ limiteMs = 240000 } = {}) {
+// html: conteúdo da página de testes (se omitido, lê dist/testes.html).
+export function rodar({ html, limiteMs = 240000 } = {}) {
   const erros = [];
   const vc = new VirtualConsole();
   vc.on('jsdomError', (e) => erros.push(e.message));
   return new Promise((resolver) => {
-    const dom = new JSDOM(fs.readFileSync(arquivo, 'utf8'), {
+    const dom = new JSDOM(html || fs.readFileSync(arquivo, 'utf8'), {
       url: pathToFileURL(arquivo).href,
       runScripts: 'dangerously',
       pretendToBeVisual: true,
@@ -46,6 +43,10 @@ export function rodar({ limiteMs = 240000 } = {}) {
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  if (!fs.existsSync(arquivo)) {
+    console.error('dist/testes.html não existe. Rode antes: node scripts/build.mjs');
+    process.exit(2);
+  }
   const r = await rodar();
   console.log(r.relatorio);
   if (r.erros.length) console.error('Erros de script no jsdom:\n' + r.erros.join('\n'));

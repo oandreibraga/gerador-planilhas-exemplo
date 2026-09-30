@@ -874,7 +874,7 @@ function perfilData(p, cels, col) {
       textos.push(String(cel.v).trim());
     }
   }
-  var desc = null;
+  var desc;
   if (tipo === 'hora') {
     desc = descritorHoraTexto(textos);
     if (desc) {
